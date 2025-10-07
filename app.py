@@ -18,11 +18,14 @@ selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.val
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
 end_date = st.sidebar.date_input("End Date", pd.to_datetime("2025-01-01"))
 
-# Fetch data
+# Fetch data with MultiIndex handling
 @st.cache_data
 def get_data(tickers, start, end):
-    data = yf.download(tickers, start=start, end=end)["Close"]
-    return data.dropna()
+    data = yf.download(tickers, start=start, end=end)["Adj Close"]
+    # If MultiIndex, reshape to wide format with tickers as columns
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(1)  # Keep only the 'Adj Close' level
+    return data
 
 if st.sidebar.button("Optimize Portfolio"):
     if not selected_assets:
