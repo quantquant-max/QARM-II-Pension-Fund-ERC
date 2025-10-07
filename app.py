@@ -7,7 +7,7 @@ import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime
 
-# Custom styling for black and white theme
+# Custom styling for black and white theme with updated text colors
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide", initial_sidebar_state="expanded")
 st.markdown(
     """
@@ -43,6 +43,14 @@ st.markdown(
     }
     .stPlotlyChart {
         background-color: #000000;
+    }
+    /* Ensure date input labels are white */
+    .stDateInput label {
+        color: #ffffff !important;
+    }
+    /* Ensure table text is white */
+    .stTable {
+        color: #ffffff !important;
     }
     </style>
     """,
