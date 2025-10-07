@@ -26,9 +26,9 @@ def get_data(tickers, start, end):
         raw_data = yf.download(tickers, start=start, end=end)
         # Extract Adj Close and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
-            adj_close = raw_data.xs("Adj Close", axis=1, level=1)
+            adj_close = raw_data.xs("Close", axis=1, level=1)
         else:
-            adj_close = raw_data["Adj Close"]
+            adj_close = raw_data["Close"]
         return adj_close.dropna()
     except Exception as e:
         st.error(f"Failed to fetch data: {str(e)}")
