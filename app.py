@@ -40,16 +40,53 @@ st.markdown(
 # Sidebar for user inputs with enhanced labels
 st.sidebar.title("Pension Fund Optimizer Settings")
 assets = {
-    "Stocks": ["SPY", "EFA", "VWO"],
-    "Corporate Bonds": ["LQD", "HYG"],
-    "Sovereign Bonds": ["TLT", "BNDX"],
-    "Commodities": ["GLD", "USO"]
+    "US Stocks": [
+        "SPY",  # S&P 500
+        "MDY",  # S&P MidCap 400
+        "IJR",  # S&P SmallCap 600
+        "XLK",  # Technology Select Sector
+        "XLF",  # Financial Select Sector
+    ],
+    "International Stocks": [
+        "EFA",  # EAFE (Europe, Australasia, Far East)
+        "VWO",  # Emerging Markets
+        "EWJ",  # Japan
+        "EEM",  # Emerging Markets (alternative)
+    ],
+    "Corporate Bonds": [
+        "LQD",  # iShares iBoxx $ Inv Grade Corp Bond
+        "HYG",  # High Yield Corporate Bond
+        "VCIT", # Intermediate Corp Bond
+        "JNK",  # High Yield Bond
+    ],
+    "Sovereign Bonds": [
+        "TLT",  # Long-Term Treasury
+        "BNDX", # Total International Bond
+        "TIP",  # TIPS (Inflation-Protected)
+        "BWX",  # International Treasury Bond
+    ],
+    "Commodities": [
+        "GLD",  # Gold
+        "SLV",  # Silver
+        "USO",  # Oil
+        "DBC",  # Broad Commodity
+    ],
+    "REITs": [
+        "VNQ",  # Vanguard Real Estate ETF
+        "RWR",  # Wilshire US REIT
+        "SCHH", # Schwab US REIT
+    ],
+    "Other": [
+        "HEFA", # MSCI EAFE Hedged
+        "EMGF", # MSCI Emerging Markets Hedged
+        "XLE",  # Energy Select Sector
+    ]
 }
 selected_assets = st.sidebar.multiselect(
     "Select Asset Classes to Include",
     options=sum(assets.values(), []),
     default=sum(assets.values(), []),
-    help="Choose the assets for your pension fund portfolio. A diverse mix ensures balanced risk."
+    help="Choose a diverse mix of assets for your pension fund portfolio to balance risk and return."
 )
 start_date = st.sidebar.date_input(
     "Start Date",
@@ -182,7 +219,7 @@ if st.sidebar.button("Optimize My Portfolio"):
 # Add welcome and instructions
 st.sidebar.markdown("### How to Use")
 st.sidebar.write("""
-- **Select Assets**: Choose the asset classes for your portfolio to ensure diversification.
+- **Select Assets**: Choose a diverse mix of assets for your portfolio to balance risk and return.
 - **Set Date Range**: Adjust the start and end dates to analyze historical performance.
 - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
 - **Explore**: Review weights, risk contributions, and performance metrics visually.
