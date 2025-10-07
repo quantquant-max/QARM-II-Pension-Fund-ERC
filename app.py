@@ -7,30 +7,42 @@ import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime
 
-# Custom styling for a professional look
+# Custom styling for black and white theme
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide", initial_sidebar_state="expanded")
 st.markdown(
     """
     <style>
     .stApp {
-        background-color: #f0f2f6;
+        background-color: #000000;
+        color: #ffffff;
     }
     .stSidebar {
-        background-color: #ffffff;
+        background-color: #111111;
+        color: #ffffff;
     }
     .stButton>button {
-        background-color: #4CAF50;
-        color: white;
+        background-color: #ffffff;
+        color: #000000;
         border-radius: 8px;
         padding: 10px 20px;
     }
     .stButton>button:hover {
-        background-color: #45a049;
+        background-color: #dddddd;
     }
     .stHeader {
-        color: #2c3e50;
+        color: #ffffff;
         font-size: 32px;
         font-weight: bold;
+    }
+    .stExpander {
+        background-color: #222222;
+        color: #ffffff;
+    }
+    .stMultiSelect [data-testid=stMarkdownContainer] {
+        color: #ffffff;
+    }
+    .stPlotlyChart {
+        background-color: #000000;
     }
     </style>
     """,
@@ -39,6 +51,8 @@ st.markdown(
 
 # Sidebar for user inputs with enhanced labels
 st.sidebar.title("Pension Fund Optimizer Settings")
+
+# Asset categories with expanders
 assets = {
     "US Stocks": [
         "SPY",  # S&P 500
@@ -82,12 +96,19 @@ assets = {
         "XLE",  # Energy Select Sector
     ]
 }
-selected_assets = st.sidebar.multiselect(
-    "Select Asset Classes to Include",
-    options=sum(assets.values(), []),
-    default=sum(assets.values(), []),
-    help="Choose a diverse mix of assets for your pension fund portfolio to balance risk and return."
-)
+
+# Collect selected assets from all categories
+selected_assets = []
+for category, tickers in assets.items():
+    with st.sidebar.expander(category, expanded=False):
+        selected = st.multiselect(
+            f"Select {category} Assets",
+            options=tickers,
+            default=[],
+            help=f"Choose assets from {category} for your portfolio."
+        )
+        selected_assets.extend(selected)
+
 start_date = st.sidebar.date_input(
     "Start Date",
     pd.to_datetime("2020-01-01"),
@@ -202,11 +223,11 @@ if st.sidebar.button("Optimize My Portfolio"):
                         
                         # Visualizations
                         fig = go.Figure(data=[go.Pie(labels=selected_assets, values=weights * 100, hole=0.3)])
-                        fig.update_layout(title="Portfolio Allocation", title_x=0.5)
+                        fig.update_layout(title="Portfolio Allocation", title_x=0.5, paper_bgcolor="#000000", font_color="#ffffff")
                         st.plotly_chart(fig)
                         
                         fig2 = go.Figure(data=[go.Bar(x=selected_assets, y=risk_contrib_pct)])
-                        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage")
+                        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#ffffff")
                         st.plotly_chart(fig2)
                         
                         # Performance metrics
@@ -219,7 +240,7 @@ if st.sidebar.button("Optimize My Portfolio"):
 # Add welcome and instructions
 st.sidebar.markdown("### How to Use")
 st.sidebar.write("""
-- **Select Assets**: Choose a diverse mix of assets for your portfolio to balance risk and return.
+- **Select Assets**: Expand categories to choose assets for your portfolio.
 - **Set Date Range**: Adjust the start and end dates to analyze historical performance.
 - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
 - **Explore**: Review weights, risk contributions, and performance metrics visually.
