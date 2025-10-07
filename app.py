@@ -5,6 +5,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import cvxpy as cp
 from scipy.optimize import minimize_scalar
+from datetime import datetime
 
 # Sidebar for user inputs
 st.sidebar.header("Portfolio Settings")
@@ -16,19 +17,25 @@ assets = {
 }
 selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.values(), []), default=sum(assets.values(), []))
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime("2024-10-01"))  # Adjusted to avoid future data
+end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date()))  # Use current date
 
-# Fetch data with robust MultiIndex handling
+# Fetch data with robust handling
 @st.cache_data
 def get_data(tickers, start, end):
     try:
         # Download data
         raw_data = yf.download(tickers, start=start, end=end)
+        if raw_data.empty:
+            raise ValueError("No data returned for the given tickers and date range.")
         # Extract Adj Close and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
-            adj_close = raw_data.xs("Close", axis=1, level=1)
+            adj_close = raw_data.xs("Adj Close", axis=1, level=1, drop_level=True)
         else:
-            adj_close = raw_data["Close"]
+            adj_close = raw_data["Adj Close"]
+        # Ensure columns match tickers
+        if not all(t in adj_close.columns for t in tickers):
+            missing = [t for t in tickers if t not in adj_close.columns]
+            raise ValueError(f"Missing data for tickers: {missing}")
         return adj_close.dropna()
     except Exception as e:
         st.error(f"Failed to fetch data: {str(e)}")
