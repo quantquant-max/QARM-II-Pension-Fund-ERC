@@ -34,11 +34,11 @@ def get_data(tickers, start, end):
         if isinstance(raw_data.columns, pd.MultiIndex):
             st.write("MultiIndex detected, levels:", raw_data.columns.levels)  # Debug output
             try:
-                adj_close = raw_data.xs("Adj Close", axis=1, level=1, drop_level=True)
+                adj_close = raw_data.xs("Adj Close", axis=1, level=1)
                 st.write("Using Adj Close data.")
             except KeyError:
                 st.write("Adj Close not found, falling back to Close data.")
-                adj_close = raw_data.xs("Close", axis=1, level=1, drop_level=True)
+                adj_close = raw_data.xs("Close", axis=1, level=1)
         else:
             try:
                 adj_close = raw_data["Adj Close"]
@@ -47,10 +47,14 @@ def get_data(tickers, start, end):
                 st.write("Adj Close not found, falling back to Close data.")
                 adj_close = raw_data["Close"]
         
+        # Debug the extracted data
+        st.write("Extracted columns:", adj_close.columns)
+        
         # Ensure columns match tickers
         if not all(t in adj_close.columns for t in tickers):
             missing = [t for t in tickers if t not in adj_close.columns]
-            raise ValueError(f"Missing data for tickers: {missing}")
+            st.error(f"Missing data for tickers: {missing}")
+            return pd.DataFrame()
         
         return adj_close.dropna()
     except Exception as e:
