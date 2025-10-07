@@ -17,9 +17,9 @@ assets = {
 }
 selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.values(), []), default=sum(assets.values(), []))
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)))  # Use yesterday to avoid future data
+end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)))  # Use yesterday
 
-# Fetch data with robust handling and debugging
+# Fetch data with robust handling and fallback to Close
 @st.cache_data
 def get_data(tickers, start, end):
     try:
@@ -30,12 +30,22 @@ def get_data(tickers, start, end):
         if raw_data.empty:
             raise ValueError("No data returned for the given tickers and date range.")
         
-        # Extract Adj Close and handle MultiIndex
+        # Extract Close or Adj Close and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
             st.write("MultiIndex detected, levels:", raw_data.columns.levels)  # Debug output
-            adj_close = raw_data.xs("Adj Close", axis=1, level=1, drop_level=True)
+            try:
+                adj_close = raw_data.xs("Adj Close", axis=1, level=1, drop_level=True)
+                st.write("Using Adj Close data.")
+            except KeyError:
+                st.write("Adj Close not found, falling back to Close data.")
+                adj_close = raw_data.xs("Close", axis=1, level=1, drop_level=True)
         else:
-            adj_close = raw_data["Adj Close"]
+            try:
+                adj_close = raw_data["Adj Close"]
+                st.write("Using Adj Close data.")
+            except KeyError:
+                st.write("Adj Close not found, falling back to Close data.")
+                adj_close = raw_data["Close"]
         
         # Ensure columns match tickers
         if not all(t in adj_close.columns for t in tickers):
