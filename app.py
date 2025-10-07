@@ -7,157 +7,185 @@ import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime
 
-# Sidebar for user inputs
-st.sidebar.header("Portfolio Settings")
+# Custom styling for a professional look
+st.set_page_config(page_title="Pension Fund Optimizer", layout="wide", initial_sidebar_state="expanded")
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #f0f2f6;
+    }
+    .stSidebar {
+        background-color: #ffffff;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 20px;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+    }
+    .stHeader {
+        color: #2c3e50;
+        font-size: 32px;
+        font-weight: bold;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Sidebar for user inputs with enhanced labels
+st.sidebar.title("Pension Fund Optimizer Settings")
 assets = {
     "Stocks": ["SPY", "EFA", "VWO"],
     "Corporate Bonds": ["LQD", "HYG"],
     "Sovereign Bonds": ["TLT", "BNDX"],
     "Commodities": ["GLD", "USO"]
 }
-selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.values(), []), default=sum(assets.values(), []))
-start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)))  # Use yesterday
+selected_assets = st.sidebar.multiselect(
+    "Select Asset Classes to Include",
+    options=sum(assets.values(), []),
+    default=sum(assets.values(), []),
+    help="Choose the assets for your pension fund portfolio. A diverse mix ensures balanced risk."
+)
+start_date = st.sidebar.date_input(
+    "Start Date",
+    pd.to_datetime("2020-01-01"),
+    help="Set the starting date for historical data analysis."
+)
+end_date = st.sidebar.date_input(
+    "End Date",
+    pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)),  # Use yesterday
+    help="Set the ending date for historical data (up to yesterday)."
+)
 
 # Fetch data with focus on Close only
 @st.cache_data
 def get_data(tickers, start, end):
     try:
-        # Download data
-        st.write("Fetching data for tickers:", tickers)  # Debug output
         raw_data = yf.download(tickers, start=start, end=end)
-        st.write("Raw data columns:", raw_data.columns)  # Debug output
         if raw_data.empty:
             raise ValueError("No data returned for the given tickers and date range.")
         
-        # Extract Close data and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
-            st.write("MultiIndex detected, levels:", raw_data.columns.levels)  # Debug output
-            close_data = raw_data.xs("Close", axis=1, level=0)  # Extract Close level
-            st.write("Close dataset:", close_data)  # Print the full Close dataset
+            close_data = raw_data.xs("Close", axis=1, level=0)
         else:
             close_data = raw_data["Close"]
-            st.write("Close dataset:", close_data)  # Print the full Close dataset
         
-        # Ensure columns match tickers
         if not all(t in close_data.columns for t in tickers):
             missing = [t for t in tickers if t not in close_data.columns]
-            st.error(f"Missing data for tickers: {missing}")
-            return pd.DataFrame()
+            raise ValueError(f"Missing data for tickers: {missing}")
         
         return close_data.dropna()
     except Exception as e:
-        st.error(f"Failed to fetch data: {str(e)}")
+        st.error(f"Data fetch failed: {str(e)}")
         return pd.DataFrame()
 
-if st.sidebar.button("Optimize Portfolio"):
+# Optimize portfolio
+if st.sidebar.button("Optimize My Portfolio"):
     if not selected_assets:
-        st.error("Please select at least one asset.")
+        st.error("Please select at least one asset to proceed.")
     else:
-        data = get_data(selected_assets, start_date, end_date)
-        if data.empty:
-            st.error("No data available for the selected assets and date range. Please adjust your selection.")
-        else:
-            returns = data.pct_change().dropna()
-            st.write("Number of return observations:", len(returns))  # Debug output
-            
-            # Check for sufficient data
-            if len(returns) < len(selected_assets) + 1:
-                st.error("Insufficient data points for optimization. Please adjust the date range.")
+        with st.spinner("Calculating your optimal portfolio..."):
+            data = get_data(selected_assets, start_date, end_date)
+            if data.empty:
+                st.error("No data available for the selected assets and date range. Please adjust your selection.")
             else:
-                # Calculate expected returns and covariance (annualized)
-                mu = returns.mean() * 252
-                S = returns.cov() * 252
-                n = len(selected_assets)
-                S_np = S.to_numpy()
-                mu_np = mu.to_numpy()
+                returns = data.pct_change().dropna()
                 
-                # Regularize covariance matrix if needed
-                min_eig = np.min(np.linalg.eigvals(S_np))
-                if min_eig < 0:
-                    st.write("Regularizing covariance matrix due to negative eigenvalues.")
-                    S_np += np.eye(n) * abs(min_eig) * 1.01  # Add small positive diagonal
-                
-                # Function to solve for weights given rho
-                def solve_with_rho(rho):
-                    w = cp.Variable(n)
-                    objective = cp.Minimize(cp.quad_form(w, S_np) - rho * cp.sum(cp.log(w)))
-                    constraints = [cp.sum(w) == 1, w >= 1e-6]
-                    prob = cp.Problem(objective, constraints)
-                    try:
-                        result = prob.solve(solver=cp.ECOS, verbose=False)
-                        st.write("Optimization status:", prob.status)  # Debug output
+                if len(returns) < len(selected_assets) + 1:
+                    st.error("Insufficient data points for optimization. Please extend the date range.")
+                else:
+                    mu = returns.mean() * 252
+                    S = returns.cov() * 252
+                    n = len(selected_assets)
+                    S_np = S.to_numpy()
+                    mu_np = mu.to_numpy()
+                    
+                    # Regularize covariance matrix if needed
+                    min_eig = np.min(np.linalg.eigvals(S_np))
+                    if min_eig < 0:
+                        S_np += np.eye(n) * abs(min_eig) * 1.01
+                    
+                    def solve_with_rho(rho):
+                        w = cp.Variable(n)
+                        objective = cp.Minimize(cp.quad_form(w, S_np) - rho * cp.sum(cp.log(w)))
+                        constraints = [cp.sum(w) == 1, w >= 1e-6]
+                        prob = cp.Problem(objective, constraints)
+                        prob.solve(solver=cp.ECOS)
                         if prob.status == "optimal":
                             return w.value
-                        else:
-                            return None
-                    except Exception as e:
-                        st.error(f"Optimization error: {str(e)}")
                         return None
-                
-                # Function to compute variance of risk contributions
-                def get_rc_var(rho):
-                    w = solve_with_rho(rho)
-                    if w is None:
-                        return np.inf
-                    var = w @ S_np @ w
-                    sigma = np.sqrt(var)
-                    MRC = S_np @ w
-                    RC = w * MRC / sigma
-                    return np.var(RC)
-                
-                # Optimize rho to minimize variance of RC
-                res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
-                best_rho = res.x
-                weights = solve_with_rho(best_rho)
-                
-                if weights is None:
-                    st.error("Optimization failed. Try adjusting parameters or date range.")
-                else:
-                    # Clean weights (set very small to zero)
-                    weights = np.where(np.abs(weights) < 1e-4, 0, weights)
-                    weights /= np.sum(weights)  # Renormalize if needed
                     
-                    # Calculate portfolio metrics
-                    port_var = weights @ S_np @ weights
-                    sigma = np.sqrt(port_var)
-                    MRC = S_np @ weights
-                    risk_contrib = weights * MRC / sigma
-                    total_risk = np.sum(risk_contrib)
-                    risk_contrib_pct = (risk_contrib / total_risk) * 100
+                    def get_rc_var(rho):
+                        w = solve_with_rho(rho)
+                        if w is None:
+                            return np.inf
+                        var = w @ S_np @ w
+                        sigma = np.sqrt(var)
+                        MRC = S_np @ w
+                        RC = w * MRC / sigma
+                        return np.var(RC)
                     
-                    # Display results
-                    st.header("Optimized Portfolio")
-                    st.write("Weights:")
-                    weight_series = pd.Series(weights, index=selected_assets)
-                    st.write(weight_series)
+                    res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
+                    best_rho = res.x
+                    weights = solve_with_rho(best_rho)
                     
-                    st.write("Risk Contributions (%):")
-                    rc_series = pd.Series(risk_contrib_pct, index=selected_assets)
-                    st.write(rc_series)
-                    
-                    # Visualization
-                    fig = go.Figure(data=[
-                        go.Pie(labels=selected_assets, values=weights, hole=0.3)
-                    ])
-                    fig.update_layout(title="Portfolio Allocation")
-                    st.plotly_chart(fig)
-                    
-                    fig2 = go.Figure(data=[
-                        go.Bar(x=selected_assets, y=risk_contrib_pct)
-                    ])
-                    fig2.update_layout(title="Risk Contributions")
-                    st.plotly_chart(fig2)
-                    
-                    # Performance metrics
-                    exp_ret = np.dot(mu_np, weights)
-                    sharpe = exp_ret / sigma if sigma > 0 else 0
-                    st.write(f"Expected Annual Return: {exp_ret:.2%}")
-                    st.write(f"Annual Volatility: {sigma:.2%}")
-                    st.write(f"Sharpe Ratio: {sharpe:.2f}")
+                    if weights is None:
+                        st.error("Optimization failed. Please try a different date range or fewer assets.")
+                    else:
+                        weights = np.where(np.abs(weights) < 1e-4, 0, weights)
+                        weights /= np.sum(weights)
+                        
+                        port_var = weights @ S_np @ weights
+                        sigma = np.sqrt(port_var)
+                        MRC = S_np @ weights
+                        risk_contrib = weights * MRC / sigma
+                        total_risk = np.sum(risk_contrib)
+                        risk_contrib_pct = (risk_contrib / total_risk) * 100
+                        
+                        # Display results in a clean layout
+                        st.title("Your Optimized Pension Fund Portfolio")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.subheader("Allocation Weights")
+                            st.table(pd.DataFrame({
+                                "Asset": selected_assets,
+                                "Weight (%)": [w * 100 for w in weights]
+                            }).set_index("Asset").round(2))
+                        with col2:
+                            st.subheader("Risk Contributions")
+                            st.table(pd.DataFrame({
+                                "Asset": selected_assets,
+                                "Contribution (%)": risk_contrib_pct.round(2)
+                            }).set_index("Asset"))
+                        
+                        # Visualizations
+                        fig = go.Figure(data=[go.Pie(labels=selected_assets, values=weights * 100, hole=0.3)])
+                        fig.update_layout(title="Portfolio Allocation", title_x=0.5)
+                        st.plotly_chart(fig)
+                        
+                        fig2 = go.Figure(data=[go.Bar(x=selected_assets, y=risk_contrib_pct)])
+                        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage")
+                        st.plotly_chart(fig2)
+                        
+                        # Performance metrics
+                        st.subheader("Performance Metrics")
+                        col3, col4, col5 = st.columns(3)
+                        col3.metric("Expected Annual Return", f"{np.dot(mu_np, weights) * 100:.2f}%")
+                        col4.metric("Annual Volatility", f"{sigma * 100:.2f}%")
+                        col5.metric("Sharpe Ratio", f"{np.dot(mu_np, weights) / sigma if sigma > 0 else 0:.2f}")
 
-# Add some interactivity and documentation
-st.sidebar.markdown("### Instructions")
-st.sidebar.write("1. Select assets and date range.")
-st.sidebar.write("2. Click 'Optimize Portfolio' to see results.")
-st.sidebar.write("3. Explore the visualizations and metrics.")
+# Add welcome and instructions
+st.sidebar.markdown("### How to Use")
+st.sidebar.write("""
+- **Select Assets**: Choose the asset classes for your portfolio to ensure diversification.
+- **Set Date Range**: Adjust the start and end dates to analyze historical performance.
+- **Optimize**: Click 'Optimize My Portfolio' to generate your results.
+- **Explore**: Review weights, risk contributions, and performance metrics visually.
+""")
+st.sidebar.markdown("---")
+st.sidebar.write("Built for your pension fund success! 🎉")
