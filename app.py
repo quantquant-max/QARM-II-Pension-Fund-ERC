@@ -21,7 +21,7 @@ end_date = st.sidebar.date_input("End Date", pd.to_datetime("2025-01-01"))
 # Fetch data
 @st.cache_data
 def get_data(tickers, start, end):
-    data = yf.download(tickers, start=start, end=end)["Adj Close"]
+    data = yf.download(tickers, start=start, end=end)["Close"]
     return data.dropna()
 
 if st.sidebar.button("Optimize Portfolio"):
