@@ -17,25 +17,31 @@ assets = {
 }
 selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.values(), []), default=sum(assets.values(), []))
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date()))  # Use current date
+end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)))  # Use yesterday to avoid future data
 
-# Fetch data with robust handling
+# Fetch data with robust handling and debugging
 @st.cache_data
 def get_data(tickers, start, end):
     try:
         # Download data
+        st.write("Fetching data for tickers:", tickers)  # Debug output
         raw_data = yf.download(tickers, start=start, end=end)
+        st.write("Raw data columns:", raw_data.columns)  # Debug output
         if raw_data.empty:
             raise ValueError("No data returned for the given tickers and date range.")
+        
         # Extract Adj Close and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
+            st.write("MultiIndex detected, levels:", raw_data.columns.levels)  # Debug output
             adj_close = raw_data.xs("Adj Close", axis=1, level=1, drop_level=True)
         else:
             adj_close = raw_data["Adj Close"]
+        
         # Ensure columns match tickers
         if not all(t in adj_close.columns for t in tickers):
             missing = [t for t in tickers if t not in adj_close.columns]
             raise ValueError(f"Missing data for tickers: {missing}")
+        
         return adj_close.dropna()
     except Exception as e:
         st.error(f"Failed to fetch data: {str(e)}")
