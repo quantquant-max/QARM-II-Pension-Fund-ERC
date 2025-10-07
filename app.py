@@ -19,7 +19,7 @@ selected_assets = st.sidebar.multiselect("Select Assets", options=sum(assets.val
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
 end_date = st.sidebar.date_input("End Date", pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)))  # Use yesterday
 
-# Fetch data with robust handling and fallback to Close
+# Fetch data with focus on Close only
 @st.cache_data
 def get_data(tickers, start, end):
     try:
@@ -30,33 +30,22 @@ def get_data(tickers, start, end):
         if raw_data.empty:
             raise ValueError("No data returned for the given tickers and date range.")
         
-        # Extract Close or Adj Close and handle MultiIndex
+        # Extract Close data and handle MultiIndex
         if isinstance(raw_data.columns, pd.MultiIndex):
             st.write("MultiIndex detected, levels:", raw_data.columns.levels)  # Debug output
-            try:
-                adj_close = raw_data.xs("Adj Close", axis=1, level=1)
-                st.write("Using Adj Close data.")
-            except KeyError:
-                st.write("Adj Close not found, falling back to Close data.")
-                adj_close = raw_data.xs("Close", axis=1, level=1)
+            close_data = raw_data.xs("Close", axis=1, level=0)  # Extract Close level
+            st.write("Close dataset:", close_data)  # Print the full Close dataset
         else:
-            try:
-                adj_close = raw_data["Adj Close"]
-                st.write("Using Adj Close data.")
-            except KeyError:
-                st.write("Adj Close not found, falling back to Close data.")
-                adj_close = raw_data["Close"]
-        
-        # Debug the extracted data
-        st.write("Extracted columns:", adj_close.columns)
+            close_data = raw_data["Close"]
+            st.write("Close dataset:", close_data)  # Print the full Close dataset
         
         # Ensure columns match tickers
-        if not all(t in adj_close.columns for t in tickers):
-            missing = [t for t in tickers if t not in adj_close.columns]
+        if not all(t in close_data.columns for t in tickers):
+            missing = [t for t in tickers if t not in close_data.columns]
             st.error(f"Missing data for tickers: {missing}")
             return pd.DataFrame()
         
-        return adj_close.dropna()
+        return close_data.dropna()
     except Exception as e:
         st.error(f"Failed to fetch data: {str(e)}")
         return pd.DataFrame()
