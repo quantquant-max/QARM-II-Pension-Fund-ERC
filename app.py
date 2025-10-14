@@ -194,32 +194,38 @@ with tab1:
         min_date = custom_data.index.min().date()
         max_date = custom_data.index.max().date()
         
-        available_stocks = custom_data.columns.tolist()
-        
-        # Rolling selection for US Stocks
-        selected_assets = st.multiselect(
-            "Select US Stocks",
-            options=available_stocks,
-            help="Choose from the list of available US stocks from the custom dataset.",
-            key="us_stocks"
+        start_date = st.date_input(
+            "Start Date",
+            min_date,  # Set to first available date
+            min_value=min_date,
+            max_value=max_date,
+            help="Set the starting date for historical data analysis.",
+            key="start_date"
         )
-    
-    start_date = st.date_input(
-        "Start Date",
-        min_date,  # Set to first available date
-        min_value=min_date,
-        max_value=max_date,
-        help="Set the starting date for historical data analysis.",
-        key="start_date"
-    )
-    end_date = st.date_input(
-        "End Date",
-        max_date,  # Set to last available date
-        min_value=min_date,
-        max_value=max_date,
-        help="Set the ending date for historical data analysis.",
-        key="end_date"
-    )
+        end_date = st.date_input(
+            "End Date",
+            max_date,  # Set to last available date
+            min_value=min_date,
+            max_value=max_date,
+            help="Set the ending date for historical data analysis.",
+            key="end_date"
+        )
+        
+        if start_date and end_date:
+            # Filter stocks that have no missing values in the selected range
+            period_data = custom_data.loc[start_date:end_date]
+            complete_stocks = [col for col in custom_data.columns if period_data[col].notna().all()]
+            available_stocks = complete_stocks
+            
+            # Rolling selection for US Stocks
+            selected_assets = st.multiselect(
+                "Select US Stocks",
+                options=available_stocks,
+                help="Choose from the list of available US stocks with complete data in the selected date range.",
+                key="us_stocks"
+            )
+        else:
+            selected_assets = []
     
     rebalance_freq = st.selectbox(
         "Rebalance Frequency",
@@ -237,8 +243,8 @@ with tab1:
     
     st.markdown("### How to Use")
     st.write("""
-    - **Select Assets**: Choose US stocks from the rolling list based on the custom dataset.
     - **Set Date Range**: Adjust the start and end dates to analyze historical performance (available range: {min_date} to {max_date}).
+    - **Select Assets**: Choose US stocks from the rolling list of stocks with complete data in the selected range.
     - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
     - **Base Currency**: View metrics in your preferred currency.
     - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
