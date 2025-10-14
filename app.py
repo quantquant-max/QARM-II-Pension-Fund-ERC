@@ -58,9 +58,9 @@ st.markdown(
     header {
         background-color: #000000 !important;
     }
-    /* Make logo 4x bigger (default ~24px, so 96px height) */
+    /* Make logo bigger (default ~24px, so 192px height for larger size) */
     header img {
-        height: 96px !important;
+        height: 192px !important;
         width: auto !important;
     }
     </style>
