@@ -57,6 +57,12 @@ st.markdown(
     .stTable {
         color: #ffffff !important;
     }
+    table {
+        color: #ffffff !important;
+    }
+    th, td {
+        color: #ffffff !important;
+    }
     /* Make top banner (header) black */
     header {
         background-color: #000000 !important;
@@ -309,9 +315,9 @@ with tab2:
         # Comparison chart
         st.subheader("Cumulative Returns Comparison")
         fig3 = go.Figure()
-        fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio'))
-        fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)'))
-        fig3.update_layout(title="Cumulative Returns", title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", font_color="#ffffff")
+        fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio', line=dict(color='blue')))
+        fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)', line=dict(color='red')))
+        fig3.update_layout(title="Cumulative Returns", title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#ffffff")
         st.plotly_chart(fig3)
     else:
         st.info("Please select assets and optimize in the Asset Selection tab.")
