@@ -5,7 +5,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import cvxpy as cp
 from scipy.optimize import minimize_scalar
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Custom styling for black and white theme with header and logo adjustments
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
@@ -152,7 +152,7 @@ assets = {
         "EEM",  # Emerging Markets (alternative)
     ],
     "Corporate Bonds": [
-        "LQD", # iShares iBoxx $ Inv Grade Corp Bond
+        "LQD",  # iShares iBoxx $ Inv Grade Corp Bond
         "HYG",  # High Yield Corporate Bond
         "VCIT", # Intermediate Corp Bond
         "JNK",  # High Yield Bond
@@ -260,54 +260,49 @@ with tab1:
                     returns = data.pct_change().dropna()
                     bench_returns = bench_data.pct_change().dropna().squeeze()
                     
-                    # Filter to user-selected period
-                    returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
-                    bench_returns = bench_returns.loc[st.session_state.start_date:st.session_state.end_date]
+                    # Filter to user-selected period for performance, but use full for estimation
+                    period_returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
+                    period_bench_returns = bench_returns.loc[st.session_state.start_date:st.session_state.end_date]
                     
-                    if len(returns) < 252:
-                        st.error("Insufficient data points for optimization. Please extend the date range.")
+                    if len(period_returns) < 2:
+                        st.error("Insufficient data points for the selected period.")
                     else:
                         # Transaction cost rate (0.1%)
                         tc_rate = 0.001
                         
-                        # Find annual rebalance dates: first trading day of each year within the range
+                        # Find annual rebalance dates: first trading day of each year within the range, including start and end if they are trading days
                         date_range = pd.date_range(start=st.session_state.start_date, end=st.session_state.end_date, freq='YS')
                         rebalance_dates = []
                         for d in date_range:
-                            # Find the first date with data on or after d
                             candidates = returns.index[returns.index >= d]
                             if not candidates.empty:
                                 rebalance_dates.append(candidates[0])
                         
-                        # Add the end date if not already included
-                        if returns.index[-1] not in rebalance_dates:
+                        # Add the end date if not already included and it's a trading day
+                        if returns.index[-1] not in rebalance_dates and returns.index[-1] > rebalance_dates[-1]:
                             rebalance_dates.append(returns.index[-1])
                         
-                        # Initialize
                         n = len(selected_assets)
-                        previous_weights = np.zeros(n)
-                        port_returns = pd.Series(index=returns.index, dtype=float)
+                        previous_weights = np.ones(n) / n  # Initial equal if needed
+                        port_returns = pd.Series(index=period_returns.index, dtype=float)
                         weights_over_time = {}
                         total_tc = 0.0
                         
-                        for i in range(len(rebalance_dates) - 1):
-                            rebal_date = rebalance_dates[i]
-                            next_rebal_date = rebalance_dates[i+1]
+                        # Initial optimization at first rebalance
+                        rebal_date = rebalance_dates[0]
+                        est_end = rebal_date - pd.Timedelta(days=1)
+                        est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
+                        est_returns = returns.loc[est_start:est_end]
+                        
+                        if len(est_returns) < n + 1:
+                            st.error("Insufficient initial estimation data for the first rebalance period.")
+                        else:
+                            mu = est_returns.mean() * 252
+                            S = est_returns.cov() * 252
+                            S_np = S.to_numpy()
+                            mu_np = mu.to_numpy()
                             
-                            # Use last 252 days before rebal_date for estimation
-                            est_end = rebal_date - pd.Timedelta(days=1)
-                            est_start = est_end - pd.Timedelta(days=365)
-                            est_returns = returns.loc[est_start:est_end]
-                            
-                            if len(est_returns) < n + 1:
-                                st.error("Insufficient estimation data for a rebalance period.")
-                                break
-                            
-                            mu_est = est_returns.mean() * 252
-                            S_est = est_returns.cov() * 252
-                            S_np = S_est.to_numpy()
-                            
-                            # Regularize
+                            # Regularize covariance matrix if needed
                             min_eig = np.min(np.linalg.eigvals(S_np))
                             if min_eig < 0:
                                 S_np += np.eye(n) * abs(min_eig) * 1.01
@@ -337,45 +332,103 @@ with tab1:
                             weights = solve_with_rho(best_rho)
                             
                             if weights is None:
-                                st.error("Optimization failed for a period.")
-                                break
+                                st.error("Initial optimization failed. Please try a different date range or fewer assets.")
+                            else:
+                                weights = np.where(np.abs(weights) < 1e-4, 0, weights)
+                                weights /= np.sum(weights)
+                                
+                                # Initial transaction from zero or equal, assume from zero, turnover = sum(weights)
+                                turnover = np.sum(np.abs(weights - previous_weights)) / 2
+                                cost = turnover * tc_rate
+                                total_tc += cost
+                                
+                                previous_weights = weights
+                                weights_over_time[rebal_date] = weights
+                        
+                        # Loop for subsequent rebalances
+                        for i in range(1, len(rebalance_dates)):
+                            rebal_date = rebalance_dates[i]
+                            prev_rebal_date = rebalance_dates[i-1]
                             
-                            weights = np.where(np.abs(weights) < 1e-4, 0, weights)
-                            weights /= np.sum(weights)
+                            # Period returns from previous to current rebalance
+                            period_returns = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)]
+                            if not period_returns.empty:
+                                period_port_ret = period_returns.dot(previous_weights)
+                                port_returns.loc[period_returns.index] = period_port_ret
                             
-                            # Transaction cost
-                            delta = weights - previous_weights
-                            turnover = np.sum(np.abs(delta)) / 2
-                            cost = turnover * tc_rate
-                            total_tc += cost
+                            # Rebalance at current date
+                            est_end = rebal_date - pd.Timedelta(days=1)
+                            est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
+                            est_returns = returns.loc[est_start:est_end]
                             
-                            # Portfolio returns for the period, subtract cost at rebalance
-                            period_returns = returns.loc[rebal_date:next_rebal_date].iloc[:-1]  # Up to but not including next rebal
-                            period_port_ret = period_returns.dot(weights)
-                            period_port_ret.iloc[0] -= cost  # Subtract cost on rebalance day
-                            port_returns.loc[period_returns.index] = period_port_ret
+                            if len(est_returns) < n + 1:
+                                st.warning(f"Insufficient data for rebalance at {rebal_date}. Keeping previous weights.")
+                                weights = previous_weights
+                                cost = 0
+                            else:
+                                mu = est_returns.mean() * 252
+                                S = est_returns.cov() * 252
+                                S_np = S.to_numpy()
+                                mu_np = mu.to_numpy()
+                                
+                                # Regularize
+                                min_eig = np.min(np.linalg.eigvals(S_np))
+                                if min_eig < 0:
+                                    S_np += np.eye(n) * abs(min_eig) * 1.01
+                                
+                                # Use same functions
+                                res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
+                                best_rho = res.x
+                                weights = solve_with_rho(best_rho)
+                                
+                                if weights is None:
+                                    st.warning(f"Optimization failed for rebalance at {rebal_date}. Keeping previous weights.")
+                                    weights = previous_weights
+                                    cost = 0
+                                else:
+                                    weights = np.where(np.abs(weights) < 1e-4, 0, weights)
+                                    weights /= np.sum(weights)
+                                    
+                                    delta = weights - previous_weights
+                                    turnover = np.sum(np.abs(delta)) / 2
+                                    cost = turnover * tc_rate
+                                    total_tc += cost
                             
-                            # Save weights
                             weights_over_time[rebal_date] = weights
                             previous_weights = weights
                         
-                        # Last period to end
-                        if 'weights' in locals():
-                            last_period_returns = returns.loc[rebalance_dates[-1]:]
-                            if not last_period_returns.empty:
-                                port_returns.loc[last_period_returns.index] = last_period_returns.dot(weights)
+                        # Last period returns
+                        last_rebal_date = rebalance_dates[-1]
+                        last_period_returns = period_returns.loc[last_rebal_date:]
+                        if not last_period_returns.empty:
+                            last_port_ret = last_period_returns.dot(previous_weights)
+                            port_returns.loc[last_period_returns.index] = last_port_ret
                         
-                        # Drop NaN if any
+                        # Drop any NaN
                         port_returns = port_returns.dropna()
+                        
+                        # Cumulative returns
+                        cum_port = (1 + port_returns).cumprod()
+                        cum_bench = (1 + period_bench_returns).cumprod()
                         
                         # Performance metrics
                         ann_return = port_returns.mean() * 252
                         ann_vol = port_returns.std() * np.sqrt(252)
                         sharpe = ann_return / ann_vol if ann_vol > 0 else 0
                         
-                        # Cumulative
-                        cum_port = (1 + port_returns).cumprod()
-                        cum_bench = (1 + bench_returns).cumprod()
+                        # Final risk contributions using last year
+                        est_returns = returns.iloc[-252:]
+                        if len(est_returns) >= n + 1:
+                            S = est_returns.cov() * 252
+                            S_np = S.to_numpy()
+                            port_var = previous_weights @ S_np @ previous_weights
+                            sigma = np.sqrt(port_var)
+                            MRC = S_np @ previous_weights
+                            risk_contrib = previous_weights * MRC / sigma
+                            total_risk = np.sum(risk_contrib)
+                            risk_contrib_pct = (risk_contrib / total_risk) * 100 if total_risk > 0 else np.zeros(n)
+                        else:
+                            risk_contrib_pct = np.ones(n) / n * 100  # Fallback
                         
                         # Weights graph
                         weights_df = pd.DataFrame(weights_over_time, index=selected_assets).T * 100
@@ -390,8 +443,8 @@ with tab1:
                         # Store results
                         st.session_state.results = {
                             "selected_assets": selected_assets,
-                            "weights": weights,  # Last weights
-                            "risk_contrib_pct": risk_contrib_pct,  # Last, or compute average? Keep last for simplicity
+                            "weights": previous_weights,
+                            "risk_contrib_pct": risk_contrib_pct,
                             "expected_return": ann_return * 100,
                             "volatility": ann_vol * 100,
                             "sharpe": sharpe,
@@ -441,7 +494,7 @@ with tab2:
         col5.metric("Sharpe Ratio", f"{results['sharpe']:.2f}")
         col6.metric("Total Transaction Costs", f"{results['total_tc']:.2f}%")
         
-        # Weights over time
+        # Weights changes over time
         st.subheader("Weights Changes Over Time")
         st.plotly_chart(results["fig_weights"])
         
@@ -465,7 +518,7 @@ with tab3:
     
     We are a dedicated team of financial experts and developers passionate about helping individuals and institutions optimize their pension funds for maximum efficiency and risk management.
     
-    Our tool uses advanced optimization techniques, specifically Equal Risk Contribution (ERC), to create balanced portfolios that aim to equalize the risk contributions from each asset.
+    Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time.
     
     Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
     
