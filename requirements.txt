@@ -6,3 +6,4 @@ plotly
 cvxpy
 scipy
 ecos
+fpdf
