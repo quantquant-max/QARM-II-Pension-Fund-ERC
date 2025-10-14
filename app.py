@@ -191,8 +191,8 @@ with tab1:
         st.error("Failed to load the custom dataset. Please ensure 'Stock_Returns_With_Names.parquet' is in the repository.")
     else:
         # Determine min and max dates from the dataset
-        min_date = custom_data.index.min()
-        max_date = custom_data.index.max()
+        min_date = custom_data.index.min().date()
+        max_date = custom_data.index.max().date()
         
         available_stocks = custom_data.columns.tolist()
         
