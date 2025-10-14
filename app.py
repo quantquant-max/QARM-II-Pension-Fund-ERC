@@ -5,7 +5,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 import cvxpy as cp
 from scipy.optimize import minimize_scalar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Custom styling for black and white theme with header and logo adjustments
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
@@ -351,10 +351,10 @@ with tab1:
                             prev_rebal_date = rebalance_dates[i-1]
                             
                             # Period returns from previous to current rebalance
-                            period_returns = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)]
-                            if not period_returns.empty:
-                                period_port_ret = period_returns.dot(previous_weights)
-                                port_returns.loc[period_returns.index] = period_port_ret
+                            period_returns_slice = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)]
+                            if not period_returns_slice.empty:
+                                period_port_ret = period_returns_slice.dot(previous_weights)
+                                port_returns.loc[period_returns_slice.index] = period_port_ret
                             
                             # Rebalance at current date
                             est_end = rebal_date - pd.Timedelta(days=1)
