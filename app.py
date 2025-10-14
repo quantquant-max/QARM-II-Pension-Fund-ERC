@@ -73,6 +73,24 @@ st.markdown(
     .stMetricValue {
         color: #f0f0f0 !important;
     }
+    [data-testid="stMetric"] {
+        color: #f0f0f0 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #f0f0f0 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #f0f0f0 !important;
+    }
+    div[data-testid="metric-container"] {
+        color: #f0f0f0 !important;
+    }
+    div[data-testid="metric-container"] p {
+        color: #f0f0f0 !important;
+    }
+    div[data-testid="metric-container"] div {
+        color: #f0f0f0 !important;
+    }
     /* Make top banner (header) black */
     header {
         background-color: #000000 !important;
