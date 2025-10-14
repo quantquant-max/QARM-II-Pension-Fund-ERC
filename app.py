@@ -63,6 +63,16 @@ st.markdown(
     th, td {
         color: #f0f0f0 !important;
     }
+    /* Style metrics */
+    .stMetric {
+        color: #f0f0f0 !important;
+    }
+    .stMetric label {
+        color: #f0f0f0 !important;
+    }
+    .stMetricValue {
+        color: #f0f0f0 !important;
+    }
     /* Make top banner (header) black */
     header {
         background-color: #000000 !important;
@@ -297,7 +307,7 @@ with tab2:
             }).set_index("Asset"))
         
         # Visualizations
-        fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3)])
+        fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3, textfont=dict(color="#f0f0f0"))])
         fig.update_layout(title="Portfolio Allocation", title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0")
         st.plotly_chart(fig)
         
