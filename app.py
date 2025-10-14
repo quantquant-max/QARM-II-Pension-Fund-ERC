@@ -14,6 +14,9 @@ st.logo("ERC Portfolio.png")  # Logo in top-left
 st.markdown(
     """
     <style>
+    :root {
+        --primary-color: #ffffff;
+    }
     .stApp {
         background-color: #000000;
         color: #ffffff;
@@ -62,6 +65,16 @@ st.markdown(
     header img {
         height: 60px !important;
         width: auto !important;
+    }
+    /* Override error messages to use white instead of red */
+    div[data-testid="stAlert"] {
+        background-color: #111111 !important;
+        color: #ffffff !important;
+        border-color: #ffffff !important;
+    }
+    div.kind-error {
+        background-color: #111111 !important;
+        color: #ffffff !important;
     }
     </style>
     """,
