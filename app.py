@@ -8,6 +8,7 @@ from scipy.optimize import minimize_scalar
 from datetime import datetime, timedelta
 from fpdf import FPDF
 import io
+from sklearn.covariance import LedoitWolf
 
 # Custom styling for black and white theme with header and logo adjustments
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
@@ -138,7 +139,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Asset categories with expanders
+# Asset categories with expanders - only US Stocks
 assets = {
     "US Stocks": [
         "SPY",  # S&P 500
@@ -146,61 +147,34 @@ assets = {
         "IJR",  # S&P SmallCap 600
         "XLK",  # Technology Select Sector
         "XLF",  # Financial Select Sector
-    ],
-    "International Stocks": [
-        "EFA",  # EAFE (Europe, Australasia, Far East)
-        "VWO",  # Emerging Markets
-        "EWJ",  # Japan
-        "EEM",  # Emerging Markets (alternative)
-    ],
-    "Corporate Bonds": [
-        "LQD",  # iShares iBoxx $ Inv Grade Corp Bond
-        "HYG",  # High Yield Corporate Bond
-        "VCIT", # Intermediate Corp Bond
-        "JNK",  # High Yield Bond
-    ],
-    "Sovereign Bonds": [
-        "TLT",  # Long-Term Treasury
-        "BNDX", # Total International Bond
-        "TIP",  # TIPS (Inflation-Protected)
-        "BWX",  # International Treasury Bond
-    ],
-    "Commodities": [
-        "GLD",  # Gold
-        "SLV",  # Silver
-        "USO",  # Oil
-        "DBC",  # Broad Commodity
-    ],
-    "REITs": [
-        "VNQ",  # Vanguard Real Estate ETF
-        "RWR",  # Wilshire US REIT
-        "SCHH", # Schwab US REIT
-    ],
-    "Other": [
-        "HEFA", # MSCI EAFE Hedged
-        "EMGF", # MSCI Emerging Markets Hedged
-        "XLE",  # Energy Select Sector
     ]
 }
 
 # Fetch data with focus on Close only
 @st.cache_data
-def get_data(tickers, start, end):
+def get_data(tickers, start, end, uploaded_data=None):
     try:
-        raw_data = yf.download(tickers, start=start, end=end)
-        if raw_data.empty:
-            raise ValueError("No data returned for the given tickers and date range.")
-        
-        if isinstance(raw_data.columns, pd.MultiIndex):
-            close_data = raw_data.xs("Close", axis=1, level=0)
+        if uploaded_data is not None:
+            # Use uploaded data if provided
+            close_data = uploaded_data.loc[start:end, tickers]
+            close_data = close_data.dropna()
+            return close_data
         else:
-            close_data = raw_data["Close"]
-        
-        if not all(t in close_data.columns for t in tickers):
-            missing = [t for t in tickers if t not in close_data.columns]
-            raise ValueError(f"Missing data for tickers: {missing}")
-        
-        return close_data.dropna()
+            # Fall back to yfinance
+            raw_data = yf.download(tickers, start=start, end=end)
+            if raw_data.empty:
+                raise ValueError("No data returned for the given tickers and date range.")
+            
+            if isinstance(raw_data.columns, pd.MultiIndex):
+                close_data = raw_data.xs("Close", axis=1, level=0)
+            else:
+                close_data = raw_data["Close"]
+            
+            if not all(t in close_data.columns for t in tickers):
+                missing = [t for t in tickers if t not in close_data.columns]
+                raise ValueError(f"Missing data for tickers: {missing}")
+            
+            return close_data.dropna()
     except Exception as e:
         st.error(f"Data fetch failed: {str(e)}")
         return pd.DataFrame()
@@ -210,6 +184,23 @@ tab1, tab2, tab3 = st.tabs(["Asset Selection", "Portfolio Results", "About Us"])
 
 with tab1:
     st.title("Asset Selection")
+    
+    # File upload for custom dataset
+    uploaded_file = st.file_uploader("Upload Custom Dataset (CSV or XLSX)", type=["csv", "xlsx"])
+    uploaded_data = None
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                uploaded_df = pd.read_csv(uploaded_file)
+            else:
+                uploaded_df = pd.read_excel(uploaded_file)
+            # Assume first column is company names, rest are dates with returns
+            uploaded_df.set_index(uploaded_df.columns[0], inplace=True)
+            uploaded_df.columns = pd.to_datetime(uploaded_df.columns)  # Convert columns to dates
+            uploaded_data = uploaded_df.transpose()  # Transpose to dates index, tickers columns
+            st.success("Custom dataset uploaded successfully!")
+        except Exception as e:
+            st.error(f"Error loading file: {str(e)}")
     
     # Collect selected assets from all categories
     for category, tickers in assets.items():
@@ -250,6 +241,7 @@ with tab1:
     
     st.markdown("### How to Use")
     st.write("""
+    - **Upload Custom Dataset**: Optional—upload your CSV/XLSX with company names as first column and dates as subsequent columns with returns.
     - **Select Assets**: Expand categories to choose assets for your portfolio.
     - **Set Date Range**: Adjust the start and end dates to analyze historical performance.
     - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
@@ -270,13 +262,18 @@ with tab1:
             with st.spinner("Calculating your optimal portfolio..."):
                 # Fetch data starting 1 year before start_date for initial estimation
                 lookback_start = st.session_state.start_date - timedelta(days=365)
-                data = get_data(selected_assets, lookback_start, st.session_state.end_date)
-                bench_data = get_data(["SPY"], lookback_start, st.session_state.end_date)
+                data = get_data(selected_assets, lookback_start, st.session_state.end_date, uploaded_data)
+                bench_data = get_data(["SPY"], lookback_start, st.session_state.end_date, uploaded_data)
                 if data.empty or bench_data.empty:
                     st.error("No data available for the selected assets and date range. Please adjust your selection.")
                 else:
-                    returns = data.pct_change().dropna()
-                    bench_returns = bench_data.pct_change().dropna().squeeze()
+                    # If uploaded, assume it's returns; else, compute from prices
+                    if uploaded_data is not None:
+                        returns = data
+                        bench_returns = bench_data.squeeze()
+                    else:
+                        returns = data.pct_change().dropna()
+                        bench_returns = bench_data.pct_change().dropna().squeeze()
                     
                     # Multi-currency: Convert to base currency if not USD
                     if base_currency != 'USD':
@@ -286,7 +283,6 @@ with tab1:
                             st.error(f"Unable to fetch forex data for {base_currency}.")
                         else:
                             forex_returns = forex_data[forex_ticker].pct_change().dropna()
-                            # Assume returns are in USD, convert to base currency
                             returns = returns.div(forex_returns, axis=0).dropna()
                             bench_returns = bench_returns.div(forex_returns, axis=0).dropna()
                     
@@ -336,14 +332,9 @@ with tab1:
                             st.error("Insufficient initial estimation data for the first rebalance period.")
                         else:
                             mu = est_returns.mean() * 252
-                            S = est_returns.cov() * 252
-                            S_np = S.to_numpy()
+                            lw = LedoitWolf().fit(est_returns)
+                            S_np = lw.covariance_ * 252
                             mu_np = mu.to_numpy()
-                            
-                            # Regularize
-                            min_eig = np.min(np.linalg.eigvals(S_np))
-                            if min_eig < 0:
-                                S_np += np.eye(n) * abs(min_eig) * 1.01
                             
                             def solve_with_rho(rho):
                                 w = cp.Variable(n)
@@ -405,14 +396,9 @@ with tab1:
                                 cost = 0
                             else:
                                 mu = est_returns.mean() * 252
-                                S = est_returns.cov() * 252
-                                S_np = S.to_numpy()
+                                lw = LedoitWolf().fit(est_returns)
+                                S_np = lw.covariance_ * 252
                                 mu_np = mu.to_numpy()
-                                
-                                # Regularize
-                                min_eig = np.min(np.linalg.eigvals(S_np))
-                                if min_eig < 0:
-                                    S_np += np.eye(n) * abs(min_eig) * 1.01
                                 
                                 res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
                                 best_rho = res.x
@@ -456,12 +442,12 @@ with tab1:
                         # Risk contrib using last year
                         est_returns = returns.iloc[-252:]
                         if len(est_returns) >= n + 1:
-                            S = est_returns.cov() * 252
-                            S_np = S.to_numpy()
-                            port_var = previous_weights @ S_np @ previous_weights
+                            lw = LedoitWolf().fit(est_returns)
+                            S_np = lw.covariance_ * 252
+                            port_var = weights @ S_np @ weights  # Use last weights
                             sigma = np.sqrt(port_var)
-                            MRC = S_np @ previous_weights
-                            risk_contrib = previous_weights * MRC / sigma
+                            MRC = S_np @ weights
+                            risk_contrib = weights * MRC / sigma
                             total_risk = np.sum(risk_contrib)
                             risk_contrib_pct = (risk_contrib / total_risk) * 100 if total_risk > 0 else np.zeros(n)
                         else:
@@ -489,7 +475,7 @@ with tab1:
                         # Store results
                         st.session_state.results = {
                             "selected_assets": selected_assets,
-                            "weights": previous_weights,
+                            "weights": weights,
                             "risk_contrib_pct": risk_contrib_pct,
                             "expected_return": ann_return * 100,
                             "volatility": ann_vol * 100,
