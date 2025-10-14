@@ -308,11 +308,15 @@ with tab2:
         
         # Visualizations
         fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3, textfont=dict(color="#f0f0f0"))])
-        fig.update_layout(title="Portfolio Allocation", title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0")
+        fig.update_layout(title=dict(text="Portfolio Allocation", font=dict(color="#f0f0f0")), title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0")
+        fig.update_traces(textfont_color="#f0f0f0")
         st.plotly_chart(fig)
         
         fig2 = go.Figure(data=[go.Bar(x=results["selected_assets"], y=results["risk_contrib_pct"])])
-        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0")
+        fig2.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0")
+        fig2.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
+        fig2.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
+        fig2.update_layout(legend=dict(font=dict(color="#f0f0f0")))
         st.plotly_chart(fig2)
         
         # Performance metrics
@@ -327,7 +331,10 @@ with tab2:
         fig3 = go.Figure()
         fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio', line=dict(color='blue')))
         fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)', line=dict(color='red')))
-        fig3.update_layout(title="Cumulative Returns", title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0")
+        fig3.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0")
+        fig3.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
+        fig3.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
+        fig3.update_layout(legend=dict(font=dict(color="#f0f0f0")))
         st.plotly_chart(fig3)
     else:
         st.info("Please select assets and optimize in the Asset Selection tab.")
