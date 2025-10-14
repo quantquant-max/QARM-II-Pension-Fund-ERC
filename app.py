@@ -6,6 +6,8 @@ import plotly.graph_objects as go
 import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime, timedelta
+from fpdf import FPDF
+import io
 
 # Custom styling for black and white theme with header and logo adjustments
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
@@ -232,10 +234,26 @@ with tab1:
         key="end_date"
     )
     
+    rebalance_freq = st.selectbox(
+        "Rebalance Frequency",
+        options=['Quarterly', 'Semi-Annually', 'Annually'],
+        index=2,  # Default to Annually
+        help="Choose how often to rebalance the portfolio."
+    )
+    
+    base_currency = st.selectbox(
+        "Base Currency",
+        options=['USD', 'EUR', 'GBP'],
+        index=0,  # Default to USD
+        help="Select the base currency for performance calculations."
+    )
+    
     st.markdown("### How to Use")
     st.write("""
     - **Select Assets**: Expand categories to choose assets for your portfolio.
     - **Set Date Range**: Adjust the start and end dates to analyze historical performance.
+    - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
+    - **Base Currency**: View metrics in your preferred currency.
     - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
     - **Explore**: Review weights, risk contributions, and performance metrics visually in the Portfolio Results tab.
     """)
@@ -260,6 +278,18 @@ with tab1:
                     returns = data.pct_change().dropna()
                     bench_returns = bench_data.pct_change().dropna().squeeze()
                     
+                    # Multi-currency: Convert to base currency if not USD
+                    if base_currency != 'USD':
+                        forex_ticker = f"{base_currency}USD=X"
+                        forex_data = get_data([forex_ticker], lookback_start, st.session_state.end_date)
+                        if forex_data.empty:
+                            st.error(f"Unable to fetch forex data for {base_currency}.")
+                        else:
+                            forex_returns = forex_data[forex_ticker].pct_change().dropna()
+                            # Assume returns are in USD, convert to base currency
+                            returns = returns.div(forex_returns, axis=0).dropna()
+                            bench_returns = bench_returns.div(forex_returns, axis=0).dropna()
+                    
                     # Filter to user-selected period for performance, but use full for estimation
                     period_returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
                     period_bench_returns = bench_returns.loc[st.session_state.start_date:st.session_state.end_date]
@@ -270,25 +300,33 @@ with tab1:
                         # Transaction cost rate (0.1%)
                         tc_rate = 0.001
                         
-                        # Find annual rebalance dates: first trading day of each year within the range, including start and end if they are trading days
-                        date_range = pd.date_range(start=st.session_state.start_date, end=st.session_state.end_date, freq='YS')
+                        # Rebalance frequency mapping
+                        freq_map = {
+                            'Quarterly': 'QS',
+                            'Semi-Annually': '6MS',
+                            'Annually': 'YS'
+                        }
+                        freq = freq_map[rebalance_freq]
+                        
+                        # Find rebalance dates
+                        date_range = pd.date_range(start=st.session_state.start_date, end=st.session_state.end_date, freq=freq)
                         rebalance_dates = []
                         for d in date_range:
                             candidates = returns.index[returns.index >= d]
                             if not candidates.empty:
                                 rebalance_dates.append(candidates[0])
                         
-                        # Add the end date if not already included and it's a trading day
+                        # Add the end date if not already included
                         if returns.index[-1] not in rebalance_dates and returns.index[-1] > rebalance_dates[-1]:
                             rebalance_dates.append(returns.index[-1])
                         
                         n = len(selected_assets)
-                        previous_weights = np.ones(n) / n  # Initial equal if needed
+                        previous_weights = np.ones(n) / n  # Initial equal
                         port_returns = pd.Series(index=period_returns.index, dtype=float)
                         weights_over_time = {}
                         total_tc = 0.0
                         
-                        # Initial optimization at first rebalance
+                        # Initial optimization
                         rebal_date = rebalance_dates[0]
                         est_end = rebal_date - pd.Timedelta(days=1)
                         est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
@@ -302,7 +340,7 @@ with tab1:
                             S_np = S.to_numpy()
                             mu_np = mu.to_numpy()
                             
-                            # Regularize covariance matrix if needed
+                            # Regularize
                             min_eig = np.min(np.linalg.eigvals(S_np))
                             if min_eig < 0:
                                 S_np += np.eye(n) * abs(min_eig) * 1.01
@@ -337,7 +375,7 @@ with tab1:
                                 weights = np.where(np.abs(weights) < 1e-4, 0, weights)
                                 weights /= np.sum(weights)
                                 
-                                # Initial transaction from zero or equal, assume from zero, turnover = sum(weights)
+                                # Initial transaction
                                 turnover = np.sum(np.abs(weights - previous_weights)) / 2
                                 cost = turnover * tc_rate
                                 total_tc += cost
@@ -345,18 +383,18 @@ with tab1:
                                 previous_weights = weights
                                 weights_over_time[rebal_date] = weights
                         
-                        # Loop for subsequent rebalances
+                        # Subsequent rebalances
                         for i in range(1, len(rebalance_dates)):
                             rebal_date = rebalance_dates[i]
                             prev_rebal_date = rebalance_dates[i-1]
                             
-                            # Period returns from previous to current rebalance
+                            # Period returns
                             period_returns_slice = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)]
                             if not period_returns_slice.empty:
                                 period_port_ret = period_returns_slice.dot(previous_weights)
                                 port_returns.loc[period_returns_slice.index] = period_port_ret
                             
-                            # Rebalance at current date
+                            # Rebalance
                             est_end = rebal_date - pd.Timedelta(days=1)
                             est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
                             est_returns = returns.loc[est_start:est_end]
@@ -376,7 +414,6 @@ with tab1:
                                 if min_eig < 0:
                                     S_np += np.eye(n) * abs(min_eig) * 1.01
                                 
-                                # Use same functions
                                 res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
                                 best_rho = res.x
                                 weights = solve_with_rho(best_rho)
@@ -397,26 +434,26 @@ with tab1:
                             weights_over_time[rebal_date] = weights
                             previous_weights = weights
                         
-                        # Last period returns
+                        # Last period
                         last_rebal_date = rebalance_dates[-1]
                         last_period_returns = period_returns.loc[last_rebal_date:]
                         if not last_period_returns.empty:
                             last_port_ret = last_period_returns.dot(previous_weights)
                             port_returns.loc[last_period_returns.index] = last_port_ret
                         
-                        # Drop any NaN
+                        # Drop NaN
                         port_returns = port_returns.dropna()
                         
-                        # Cumulative returns
+                        # Cumulative
                         cum_port = (1 + port_returns).cumprod()
                         cum_bench = (1 + period_bench_returns).cumprod()
                         
-                        # Performance metrics
+                        # Metrics
                         ann_return = port_returns.mean() * 252
                         ann_vol = port_returns.std() * np.sqrt(252)
                         sharpe = ann_return / ann_vol if ann_vol > 0 else 0
                         
-                        # Final risk contributions using last year
+                        # Risk contrib using last year
                         est_returns = returns.iloc[-252:]
                         if len(est_returns) >= n + 1:
                             S = est_returns.cov() * 252
@@ -428,14 +465,23 @@ with tab1:
                             total_risk = np.sum(risk_contrib)
                             risk_contrib_pct = (risk_contrib / total_risk) * 100 if total_risk > 0 else np.zeros(n)
                         else:
-                            risk_contrib_pct = np.ones(n) / n * 100  # Fallback
+                            risk_contrib_pct = np.ones(n) / n * 100
                         
-                        # Weights graph
+                        # Weights animation
                         weights_df = pd.DataFrame(weights_over_time, index=selected_assets).T * 100
-                        fig_weights = go.Figure()
-                        for asset in selected_assets:
-                            fig_weights.add_trace(go.Bar(x=weights_df.index, y=weights_df[asset], name=asset))
-                        fig_weights.update_layout(barmode='stack', title=dict(text="Weights Over Time (%)", font=dict(color="#f0f0f0", family="Times New Roman")), paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+                        frames = []
+                        dates = sorted(weights_df.index)
+                        for i in range(len(dates)):
+                            frame_data = []
+                            for asset in selected_assets:
+                                frame_data.append(go.Bar(x=selected_assets, y=weights_df.iloc[i], name=asset))
+                            frames.append(go.Frame(data=frame_data, name=str(dates[i])))
+                        
+                        fig_weights = go.Figure(data=[go.Bar(x=selected_assets, y=weights_df.iloc[0], name=asset) for asset in selected_assets],
+                                                layout=go.Layout(updatemenus=[dict(type="buttons", buttons=[dict(label="Play", method="animate", args=[None])])],
+                                                                 transition_duration=500))
+                        fig_weights.frames = frames
+                        fig_weights.update_layout(title=dict(text="Weights Evolution Over Time (%)", font=dict(color="#f0f0f0", family="Times New Roman")), paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
                         fig_weights.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
                         fig_weights.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
                         fig_weights.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
@@ -451,7 +497,9 @@ with tab1:
                             "cum_port": cum_port,
                             "cum_bench": cum_bench,
                             "total_tc": total_tc * 100,
-                            "fig_weights": fig_weights
+                            "fig_weights": fig_weights,
+                            "port_returns": port_returns,
+                            "weights_df": weights_df
                         }
                         st.success("Optimization complete! Check the Portfolio Results tab.")
 
@@ -477,14 +525,14 @@ with tab2:
         fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3, textfont=dict(color="#f0f0f0", family="Times New Roman"))])
         fig.update_layout(title=dict(text="Portfolio Allocation", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
         fig.update_traces(textfont_color="#f0f0f0")
-        st.plotly_chart(fig)
+        st.plotly_chart(fig, use_container_width=True)
         
         fig2 = go.Figure(data=[go.Bar(x=results["selected_assets"], y=results["risk_contrib_pct"])])
         fig2.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
         fig2.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
         fig2.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
         fig2.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
-        st.plotly_chart(fig2)
+        st.plotly_chart(fig2, use_container_width=True)
         
         # Performance metrics
         st.subheader("Performance Metrics")
@@ -494,9 +542,9 @@ with tab2:
         col5.metric("Sharpe Ratio", f"{results['sharpe']:.2f}")
         col6.metric("Total Transaction Costs", f"{results['total_tc']:.2f}%")
         
-        # Weights changes over time
-        st.subheader("Weights Changes Over Time")
-        st.plotly_chart(results["fig_weights"])
+        # Weights changes over time with animation
+        st.subheader("Weights Evolution Over Time")
+        st.plotly_chart(results["fig_weights"], use_container_width=True)
         
         # Comparison chart
         st.subheader("Cumulative Returns Comparison")
@@ -507,7 +555,38 @@ with tab2:
         fig3.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
         fig3.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
         fig3.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
-        st.plotly_chart(fig3)
+        st.plotly_chart(fig3, use_container_width=True)
+        
+        # Export features
+        st.subheader("Export Results")
+        # CSV export
+        csv = results["weights_df"].to_csv()
+        st.download_button(
+            label="Download Weights History as CSV",
+            data=csv,
+            file_name="weights_history.csv",
+            mime="text/csv"
+        )
+        
+        # PDF export
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Times", size=12)
+        pdf.cell(200, 10, txt="Portfolio Results", ln=1, align='C')
+        pdf.cell(200, 10, txt=f"Expected Annual Return: {results['expected_return']:.2f}%", ln=1)
+        pdf.cell(200, 10, txt=f"Annual Volatility: {results['volatility']:.2f}%", ln=1)
+        pdf.cell(200, 10, txt=f"Sharpe Ratio: {results['sharpe']:.2f}", ln=1)
+        pdf.cell(200, 10, txt=f"Total Transaction Costs: {results['total_tc']:.2f}%", ln=1)
+        # Add more details as needed
+        pdf_buffer = io.BytesIO()
+        pdf.output(pdf_buffer)
+        pdf_buffer.seek(0)
+        st.download_button(
+            label="Download Report as PDF",
+            data=pdf_buffer,
+            file_name="portfolio_report.pdf",
+            mime="application/pdf"
+        )
     else:
         st.info("Please select assets and optimize in the Asset Selection tab.")
 
