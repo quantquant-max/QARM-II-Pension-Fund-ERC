@@ -7,7 +7,7 @@ import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime
 
-# Custom styling for black and white theme with logo positioning
+# Custom styling for black and white theme with updated text colors
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
 st.markdown(
     """
@@ -44,9 +44,11 @@ st.markdown(
     .stPlotlyChart {
         background-color: #000000;
     }
+    /* Ensure date input labels are white */
     .stDateInput label {
         color: #ffffff !important;
     }
+    /* Ensure table text is white */
     .stTable {
         color: #ffffff !important;
     }
@@ -58,7 +60,7 @@ st.markdown(
         z-index: 1000;
     }
     .logo-img {
-        width: 150px; /* Adjusted size for better fit; original is 500x500, scaled down */
+        width: 100px; /* Adjust size as needed */
         height: auto;
     }
     </style>
@@ -66,11 +68,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Display logo (assuming the file is named 'logo.png' in the main project directory)
+# Display logo
 st.markdown(
     """
     <div class="logo-container">
-        <img class="logo-img" src="logo.png" alt="Logo">
+        <img class="logo-img" src="ERC Portfolio.png" alt="ERC Portfolio Logo">
     </div>
     """,
     unsafe_allow_html=True
