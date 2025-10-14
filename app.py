@@ -142,7 +142,7 @@ st.markdown(
 @st.cache_data
 def load_custom_data():
     try:
-        df = pd.read_parquet("Stock_Returns_With_Names.parquet")
+        df = pd.read_csv("Stock_Returns_With_Namespost2000.csv")
         df.set_index(df.columns[0], inplace=True)  # Set company names as index
         df.columns = pd.to_datetime(df.columns)  # Convert date columns to datetime
         df = df.transpose()  # Transpose to dates as index, companies as columns
@@ -188,7 +188,7 @@ with tab1:
     # Load the custom dataset
     custom_data = load_custom_data()
     if custom_data.empty:
-        st.error("Failed to load the custom dataset. Please ensure 'Stock_Returns_With_Names.parquet' is in the repository.")
+        st.error("Failed to load the custom dataset. Please ensure 'Stock_Returns_With_Namespost2000.csv' is in the repository.")
     else:
         # Determine min and max dates from the dataset
         min_date = custom_data.index.min().date()
