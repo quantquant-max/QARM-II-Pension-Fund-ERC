@@ -15,18 +15,18 @@ st.markdown(
     """
     <style>
     :root {
-        --primary-color: #ffffff;
+        --primary-color: #f0f0f0;
     }
     .stApp {
         background-color: #000000;
-        color: #ffffff;
+        color: #f0f0f0;
     }
     .stSidebar {
         background-color: #111111;
-        color: #ffffff;
+        color: #f0f0f0;
     }
     .stButton>button {
-        background-color: #ffffff;
+        background-color: #f0f0f0;
         color: #000000;
         border-radius: 8px;
         padding: 10px 20px;
@@ -35,33 +35,33 @@ st.markdown(
         background-color: #dddddd;
     }
     .stHeader {
-        color: #ffffff;
+        color: #f0f0f0;
         font-size: 32px;
         font-weight: bold;
     }
     .stExpander {
         background-color: #222222;
-        color: #ffffff;
+        color: #f0f0f0;
     }
     .stMultiSelect [data-testid=stMarkdownContainer] {
-        color: #ffffff;
+        color: #f0f0f0;
     }
     .stPlotlyChart {
         background-color: #000000;
     }
     /* Ensure date input labels are white */
     .stDateInput label {
-        color: #ffffff !important;
+        color: #f0f0f0 !important;
     }
     /* Ensure table text is white */
     .stTable {
-        color: #ffffff !important;
+        color: #f0f0f0 !important;
     }
     table {
-        color: #ffffff !important;
+        color: #f0f0f0 !important;
     }
     th, td {
-        color: #ffffff !important;
+        color: #f0f0f0 !important;
     }
     /* Make top banner (header) black */
     header {
@@ -75,12 +75,12 @@ st.markdown(
     /* Override error messages to use white instead of red */
     div[data-testid="stAlert"] {
         background-color: #111111 !important;
-        color: #ffffff !important;
-        border-color: #ffffff !important;
+        color: #f0f0f0 !important;
+        border-color: #f0f0f0 !important;
     }
     div.kind-error {
         background-color: #111111 !important;
-        color: #ffffff !important;
+        color: #f0f0f0 !important;
     }
     </style>
     """,
@@ -298,11 +298,11 @@ with tab2:
         
         # Visualizations
         fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3)])
-        fig.update_layout(title="Portfolio Allocation", title_x=0.5, paper_bgcolor="#000000", font_color="#ffffff")
+        fig.update_layout(title="Portfolio Allocation", title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0")
         st.plotly_chart(fig)
         
         fig2 = go.Figure(data=[go.Bar(x=results["selected_assets"], y=results["risk_contrib_pct"])])
-        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#ffffff")
+        fig2.update_layout(title="Risk Contributions", title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0")
         st.plotly_chart(fig2)
         
         # Performance metrics
@@ -317,7 +317,7 @@ with tab2:
         fig3 = go.Figure()
         fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio', line=dict(color='blue')))
         fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)', line=dict(color='red')))
-        fig3.update_layout(title="Cumulative Returns", title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#ffffff")
+        fig3.update_layout(title="Cumulative Returns", title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0")
         st.plotly_chart(fig3)
     else:
         st.info("Please select assets and optimize in the Asset Selection tab.")
