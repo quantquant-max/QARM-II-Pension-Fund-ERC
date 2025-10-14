@@ -20,16 +20,19 @@ st.markdown(
     .stApp {
         background-color: #000000;
         color: #f0f0f0;
+        font-family: 'Times New Roman', serif;
     }
     .stSidebar {
         background-color: #111111;
         color: #f0f0f0;
+        font-family: 'Times New Roman', serif;
     }
     .stButton>button {
         background-color: #f0f0f0;
         color: #000000;
         border-radius: 8px;
         padding: 10px 20px;
+        font-family: 'Times New Roman', serif;
     }
     .stButton>button:hover {
         background-color: #dddddd;
@@ -38,13 +41,16 @@ st.markdown(
         color: #f0f0f0;
         font-size: 32px;
         font-weight: bold;
+        font-family: 'Times New Roman', serif;
     }
     .stExpander {
         background-color: #222222;
         color: #f0f0f0;
+        font-family: 'Times New Roman', serif;
     }
     .stMultiSelect [data-testid=stMarkdownContainer] {
         color: #f0f0f0;
+        font-family: 'Times New Roman', serif;
     }
     .stPlotlyChart {
         background-color: #000000;
@@ -52,44 +58,57 @@ st.markdown(
     /* Ensure date input labels are white */
     .stDateInput label {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     /* Ensure table text is white */
     .stTable {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     table {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     th, td {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     /* Style metrics */
     .stMetric {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     .stMetric label {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     .stMetricValue {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     [data-testid="stMetric"] {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     [data-testid="stMetricLabel"] {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     [data-testid="stMetricValue"] {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     div[data-testid="metric-container"] {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     div[data-testid="metric-container"] p {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     div[data-testid="metric-container"] div {
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     /* Make top banner (header) black */
     header {
@@ -105,10 +124,12 @@ st.markdown(
         background-color: #111111 !important;
         color: #f0f0f0 !important;
         border-color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     div.kind-error {
         background-color: #111111 !important;
         color: #f0f0f0 !important;
+        font-family: 'Times New Roman', serif;
     }
     </style>
     """,
@@ -325,16 +346,16 @@ with tab2:
             }).set_index("Asset"))
         
         # Visualizations
-        fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3, textfont=dict(color="#f0f0f0"))])
-        fig.update_layout(title=dict(text="Portfolio Allocation", font=dict(color="#f0f0f0")), title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0")
+        fig = go.Figure(data=[go.Pie(labels=results["selected_assets"], values=results["weights"] * 100, hole=0.3, textfont=dict(color="#f0f0f0", family="Times New Roman"))])
+        fig.update_layout(title=dict(text="Portfolio Allocation", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
         fig.update_traces(textfont_color="#f0f0f0")
         st.plotly_chart(fig)
         
         fig2 = go.Figure(data=[go.Bar(x=results["selected_assets"], y=results["risk_contrib_pct"])])
-        fig2.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0")
-        fig2.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
-        fig2.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
-        fig2.update_layout(legend=dict(font=dict(color="#f0f0f0")))
+        fig2.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+        fig2.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig2.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig2.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
         st.plotly_chart(fig2)
         
         # Performance metrics
@@ -349,10 +370,10 @@ with tab2:
         fig3 = go.Figure()
         fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio', line=dict(color='blue')))
         fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)', line=dict(color='red')))
-        fig3.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0")
-        fig3.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
-        fig3.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0")
-        fig3.update_layout(legend=dict(font=dict(color="#f0f0f0")))
+        fig3.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+        fig3.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig3.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig3.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
         st.plotly_chart(fig3)
     else:
         st.info("Please select assets and optimize in the Asset Selection tab.")
