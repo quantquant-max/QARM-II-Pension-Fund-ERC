@@ -139,28 +139,29 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Asset categories with expanders - only US Stocks
-assets = {
-    "US Stocks": [
-        "SPY",  # S&P 500
-        "MDY",  # S&P MidCap 400
-        "IJR",  # S&P SmallCap 600
-        "XLK",  # Technology Select Sector
-        "XLF",  # Financial Select Sector
-    ]
-}
+# Load the custom dataset
+@st.cache_data
+def load_custom_data():
+    try:
+        df = pd.read_parquet("Stock_Returns_With_Names.parquet")
+        df.set_index(df.columns[0], inplace=True)  # Set company names as index
+        df.columns = pd.to_datetime(df.columns)  # Convert date columns to datetime
+        df = df.transpose()  # Transpose to dates as index, companies as columns
+        return df
+    except Exception as e:
+        st.error(f"Error loading custom dataset: {str(e)}")
+        return pd.DataFrame()
 
 # Fetch data with focus on Close only
 @st.cache_data
 def get_data(tickers, start, end, uploaded_data=None):
     try:
         if uploaded_data is not None:
-            # Use uploaded data if provided
             close_data = uploaded_data.loc[start:end, tickers]
             close_data = close_data.dropna()
             return close_data
         else:
-            # Fall back to yfinance
+            # Fall back to yfinance (though not used here with custom data)
             raw_data = yf.download(tickers, start=start, end=end)
             if raw_data.empty:
                 raise ValueError("No data returned for the given tickers and date range.")
@@ -185,43 +186,39 @@ tab1, tab2, tab3 = st.tabs(["Asset Selection", "Portfolio Results", "About Us"])
 with tab1:
     st.title("Asset Selection")
     
-    # File upload for custom dataset
-    uploaded_file = st.file_uploader("Upload Custom Dataset (CSV or XLSX)", type=["csv", "xlsx"])
-    uploaded_data = None
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                uploaded_df = pd.read_csv(uploaded_file)
-            else:
-                uploaded_df = pd.read_excel(uploaded_file)
-            # Assume first column is company names, rest are dates with returns
-            uploaded_df.set_index(uploaded_df.columns[0], inplace=True)
-            uploaded_df.columns = pd.to_datetime(uploaded_df.columns)  # Convert columns to dates
-            uploaded_data = uploaded_df.transpose()  # Transpose to dates index, tickers columns
-            st.success("Custom dataset uploaded successfully!")
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
-    
-    # Collect selected assets from all categories
-    for category, tickers in assets.items():
-        with st.expander(category, expanded=False):
-            st.multiselect(
-                f"Select {category} Assets",
-                options=tickers,
-                help=f"Choose assets from {category} for your portfolio.",
-                key=category
-            )
+    # Load the custom dataset
+    custom_data = load_custom_data()
+    if custom_data.empty:
+        st.error("Failed to load the custom dataset. Please ensure 'Stock_Returns_With_Names.parquet' is in the repository.")
+    else:
+        # Determine min and max dates from the dataset
+        min_date = custom_data.index.min()
+        max_date = custom_data.index.max()
+        
+        available_stocks = custom_data.columns.tolist()
+        
+        # Rolling selection for US Stocks
+        selected_assets = st.multiselect(
+            "Select US Stocks",
+            options=available_stocks,
+            help="Choose from the list of available US stocks from the custom dataset.",
+            key="us_stocks"
+        )
     
     start_date = st.date_input(
         "Start Date",
-        pd.to_datetime("2020-01-01"),
+        min_date,  # Set to first available date
+        min_value=min_date,
+        max_value=max_date,
         help="Set the starting date for historical data analysis.",
         key="start_date"
     )
     end_date = st.date_input(
         "End Date",
-        pd.to_datetime(datetime.now().date() - pd.Timedelta(days=1)),  # Use yesterday
-        help="Set the ending date for historical data (up to yesterday).",
+        max_date,  # Set to last available date
+        min_value=min_date,
+        max_value=max_date,
+        help="Set the ending date for historical data analysis.",
         key="end_date"
     )
     
@@ -241,39 +238,30 @@ with tab1:
     
     st.markdown("### How to Use")
     st.write("""
-    - **Upload Custom Dataset**: Optional—upload your CSV/XLSX with company names as first column and dates as subsequent columns with returns.
-    - **Select Assets**: Expand categories to choose assets for your portfolio.
-    - **Set Date Range**: Adjust the start and end dates to analyze historical performance.
+    - **Select Assets**: Choose US stocks from the rolling list based on the custom dataset.
+    - **Set Date Range**: Adjust the start and end dates to analyze historical performance (available range: {min_date} to {max_date}).
     - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
     - **Base Currency**: View metrics in your preferred currency.
     - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
     - **Explore**: Review weights, risk contributions, and performance metrics visually in the Portfolio Results tab.
-    """)
+    """.format(min_date=min_date.strftime('%Y-%m-%d'), max_date=max_date.strftime('%Y-%m-%d')))
     st.write("Built for your pension fund success! 🎉")
     
     if st.button("Optimize My Portfolio"):
-        selected_assets = []
-        for category in assets:
-            selected_assets.extend(st.session_state.get(category, []))
-        
         if not selected_assets:
             st.error("Please select at least one asset to proceed.")
         else:
             with st.spinner("Calculating your optimal portfolio..."):
-                # Fetch data starting 1 year before start_date for initial estimation
+                # Fetch data from custom dataset
                 lookback_start = st.session_state.start_date - timedelta(days=365)
-                data = get_data(selected_assets, lookback_start, st.session_state.end_date, uploaded_data)
-                bench_data = get_data(["SPY"], lookback_start, st.session_state.end_date, uploaded_data)
+                data = get_data(selected_assets, lookback_start, st.session_state.end_date, custom_data)
+                bench_data = get_data(["SPY"], lookback_start, st.session_state.end_date, custom_data)
                 if data.empty or bench_data.empty:
                     st.error("No data available for the selected assets and date range. Please adjust your selection.")
                 else:
-                    # If uploaded, assume it's returns; else, compute from prices
-                    if uploaded_data is not None:
-                        returns = data
-                        bench_returns = bench_data.squeeze()
-                    else:
-                        returns = data.pct_change().dropna()
-                        bench_returns = bench_data.pct_change().dropna().squeeze()
+                    # Use returns directly from dataset
+                    returns = data
+                    bench_returns = bench_data.squeeze()
                     
                     # Multi-currency: Convert to base currency if not USD
                     if base_currency != 'USD':
@@ -286,7 +274,7 @@ with tab1:
                             returns = returns.div(forex_returns, axis=0).dropna()
                             bench_returns = bench_returns.div(forex_returns, axis=0).dropna()
                     
-                    # Filter to user-selected period for performance, but use full for estimation
+                    # Filter to user-selected period for performance
                     period_returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
                     period_bench_returns = bench_returns.loc[st.session_state.start_date:st.session_state.end_date]
                     
