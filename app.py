@@ -143,8 +143,8 @@ st.markdown(
 def load_custom_data():
     try:
         df = pd.read_csv("Stock_Returns_With_Namespost2000.csv")
-        df.set_index(df.columns[0], inplace=True)  # Set company names as index
-        df.columns = pd.to_datetime(df.columns)  # Convert date columns to datetime
+        df.set_index('COMNAM', inplace=True)  # Set company names as index
+        df.columns = pd.to_datetime(df.columns.str.split(' ').str[0])  # Remove time part and convert to datetime
         df = df.transpose()  # Transpose to dates as index, companies as columns
         return df
     except Exception as e:
@@ -204,22 +204,34 @@ with tab1:
             key="us_stocks"
         )
     
-    start_date = st.date_input(
-        "Start Date",
-        min_date,  # Set to first available date
-        min_value=min_date,
-        max_value=max_date,
-        help="Set the starting date for historical data analysis.",
-        key="start_date"
+    start_year = st.selectbox(
+        "Start Year",
+        options=range(min_date.year, max_date.year + 1),
+        index=0,
+        help="Select the starting year."
     )
-    end_date = st.date_input(
-        "End Date",
-        max_date,  # Set to last available date
-        min_value=min_date,
-        max_value=max_date,
-        help="Set the ending date for historical data analysis.",
-        key="end_date"
+    start_month = st.selectbox(
+        "Start Month",
+        options=range(1, 13),
+        index=min_date.month - 1,
+        help="Select the starting month."
     )
+    end_year = st.selectbox(
+        "End Year",
+        options=range(min_date.year, max_date.year + 1),
+        index=(max_date.year - min_date.year),
+        help="Select the ending year."
+    )
+    end_month = st.selectbox(
+        "End Month",
+        options=range(1, 13),
+        index=max_date.month - 1,
+        help="Select the ending month."
+    )
+    
+    # Construct start and end dates as last day of the month
+    start_date = datetime(start_year, start_month, 1) + timedelta(days=31) - timedelta(days=1)
+    end_date = datetime(end_year, end_month, 1) + timedelta(days=31) - timedelta(days=1)
     
     rebalance_freq = st.selectbox(
         "Rebalance Frequency",
@@ -252,10 +264,10 @@ with tab1:
         else:
             with st.spinner("Calculating your optimal portfolio..."):
                 # Fetch data from custom dataset
-                lookback_start = st.session_state.start_date - timedelta(days=365)
-                data = get_data(selected_assets, lookback_start, st.session_state.end_date, custom_data)
+                lookback_start = start_date - timedelta(days=365)
+                data = get_data(selected_assets, lookback_start, end_date, custom_data)
                 # Use "Value Weighted Benchmark" and "Equally Weighted Benchmark" from custom data
-                bench_data = get_data(["Value Weighted Benchmark", "Equally Weighted Benchmark"], lookback_start, st.session_state.end_date, custom_data)
+                bench_data = get_data(["Value Weighted Benchmark", "Equally Weighted Benchmark"], lookback_start, end_date, custom_data)
                 if data.empty or bench_data.empty:
                     st.error("No data available for the selected assets and date range. Please adjust your selection.")
                 else:
@@ -268,7 +280,7 @@ with tab1:
                     # Multi-currency: Convert to base currency if not USD
                     if base_currency != 'USD':
                         forex_ticker = f"{base_currency}USD=X"
-                        forex_data = get_data([forex_ticker], lookback_start, st.session_state.end_date)
+                        forex_data = get_data([forex_ticker], lookback_start, end_date)
                         if forex_data.empty:
                             st.error(f"Unable to fetch forex data for {base_currency}.")
                         else:
@@ -278,9 +290,9 @@ with tab1:
                             equally_weighted_returns = equally_weighted_returns.div(forex_returns).dropna()
                     
                     # Filter to user-selected period for performance
-                    period_returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
-                    period_value_weighted = value_weighted_returns.loc[st.session_state.start_date:st.session_state.end_date]
-                    period_equally_weighted = equally_weighted_returns.loc[st.session_state.start_date:st.session_state.end_date]
+                    period_returns = returns.loc[start_date:end_date]
+                    period_value_weighted = value_weighted_returns.loc[start_date:end_date]
+                    period_equally_weighted = equally_weighted_returns.loc[start_date:end_date]
                     
                     if len(period_returns) < 2:
                         st.error("Insufficient data points for the selected period.")
@@ -297,7 +309,7 @@ with tab1:
                         freq = freq_map[rebalance_freq]
                         
                         # Find rebalance dates
-                        date_range = pd.date_range(start=st.session_state.start_date, end=st.session_state.end_date, freq=freq)
+                        date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
                         rebalance_dates = []
                         for d in date_range:
                             candidates = returns.index[returns.index >= d]
