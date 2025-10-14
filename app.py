@@ -7,8 +7,10 @@ import cvxpy as cp
 from scipy.optimize import minimize_scalar
 from datetime import datetime
 
-# Custom styling for black and white theme with updated text colors
+# Custom styling for black and white theme (remove logo-specific CSS)
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
+st.logo("ERC Portfolio.png")  # Add this line for the top-left logo
+
 st.markdown(
     """
     <style>
@@ -52,21 +54,12 @@ st.markdown(
     .stTable {
         color: #ffffff !important;
     }
-    /* Logo styling */
-    .logo-container {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 1000;
-    }
-    .logo-img {
-        width: 100px; /* Adjust size as needed */
-        height: auto;
-    }
     </style>
     """,
     unsafe_allow_html=True
 )
+
+
 
 # Display logo
 st.markdown(
