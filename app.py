@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import plotly.graph_objects as go
 import cvxpy as cp
 from scipy.optimize import minimize_scalar
@@ -255,13 +254,16 @@ with tab1:
                 # Fetch data from custom dataset
                 lookback_start = st.session_state.start_date - timedelta(days=365)
                 data = get_data(selected_assets, lookback_start, st.session_state.end_date, custom_data)
-                bench_data = get_data(["SPY"], lookback_start, st.session_state.end_date, custom_data)
+                # Use "Value Weighted Benchmark" and "Equally Weighted Benchmark" from custom data
+                bench_data = get_data(["Value Weighted Benchmark", "Equally Weighted Benchmark"], lookback_start, st.session_state.end_date, custom_data)
                 if data.empty or bench_data.empty:
                     st.error("No data available for the selected assets and date range. Please adjust your selection.")
                 else:
                     # Use returns directly from dataset
                     returns = data
-                    bench_returns = bench_data.squeeze()
+                    # Extract benchmark returns
+                    value_weighted_returns = bench_data["Value Weighted Benchmark"]
+                    equally_weighted_returns = bench_data["Equally Weighted Benchmark"]
                     
                     # Multi-currency: Convert to base currency if not USD
                     if base_currency != 'USD':
@@ -272,11 +274,13 @@ with tab1:
                         else:
                             forex_returns = forex_data[forex_ticker].pct_change().dropna()
                             returns = returns.div(forex_returns, axis=0).dropna()
-                            bench_returns = bench_returns.div(forex_returns, axis=0).dropna()
+                            value_weighted_returns = value_weighted_returns.div(forex_returns).dropna()
+                            equally_weighted_returns = equally_weighted_returns.div(forex_returns).dropna()
                     
                     # Filter to user-selected period for performance
                     period_returns = returns.loc[st.session_state.start_date:st.session_state.end_date]
-                    period_bench_returns = bench_returns.loc[st.session_state.start_date:st.session_state.end_date]
+                    period_value_weighted = value_weighted_returns.loc[st.session_state.start_date:st.session_state.end_date]
+                    period_equally_weighted = equally_weighted_returns.loc[st.session_state.start_date:st.session_state.end_date]
                     
                     if len(period_returns) < 2:
                         st.error("Insufficient data points for the selected period.")
@@ -420,7 +424,8 @@ with tab1:
                         
                         # Cumulative
                         cum_port = (1 + port_returns).cumprod()
-                        cum_bench = (1 + period_bench_returns).cumprod()
+                        cum_value_weighted = (1 + period_value_weighted).cumprod()
+                        cum_equally_weighted = (1 + period_equally_weighted).cumprod()
                         
                         # Metrics
                         ann_return = port_returns.mean() * 252
@@ -469,7 +474,8 @@ with tab1:
                             "volatility": ann_vol * 100,
                             "sharpe": sharpe,
                             "cum_port": cum_port,
-                            "cum_bench": cum_bench,
+                            "cum_value_weighted": cum_value_weighted,
+                            "cum_equally_weighted": cum_equally_weighted,
                             "total_tc": total_tc * 100,
                             "fig_weights": fig_weights,
                             "port_returns": port_returns,
@@ -524,7 +530,8 @@ with tab2:
         st.subheader("Cumulative Returns Comparison")
         fig3 = go.Figure()
         fig3.add_trace(go.Scatter(x=results["cum_port"].index, y=results["cum_port"], mode='lines', name='Portfolio', line=dict(color='blue')))
-        fig3.add_trace(go.Scatter(x=results["cum_bench"].index, y=results["cum_bench"], mode='lines', name='Benchmark (SPY)', line=dict(color='red')))
+        fig3.add_trace(go.Scatter(x=results["cum_value_weighted"].index, y=results["cum_value_weighted"], mode='lines', name='Value Weighted Benchmark', line=dict(color='green')))
+        fig3.add_trace(go.Scatter(x=results["cum_equally_weighted"].index, y=results["cum_equally_weighted"], mode='lines', name='Equally Weighted Benchmark', line=dict(color='red')))
         fig3.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
         fig3.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
         fig3.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
