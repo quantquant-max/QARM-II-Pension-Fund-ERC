@@ -60,7 +60,7 @@ st.markdown(
     }
     /* Make logo 4x bigger (default ~24px, so 96px height) */
     header img {
-        height: 72px !important;
+        height: 68px !important;
         width: auto !important;
     }
     </style>
