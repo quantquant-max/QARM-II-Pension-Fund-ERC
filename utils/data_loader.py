@@ -12,8 +12,8 @@ def load_custom_data():
 
 def get_data(tickers, start, end, custom_data):
     try:
-        close_data = custom_data.loc[start:end, tickers]
-        close_data = close_data.dropna()
-        return close_data
+        data = custom_data.loc[start:end, tickers]
+        data = data.dropna()
+        return data  # Already returns from CSV
     except Exception as e:
         return pd.DataFrame()
