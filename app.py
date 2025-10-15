@@ -140,6 +140,7 @@ def load_custom_data():
         df.set_index('COMNAM', inplace=True)
         df.columns = pd.to_datetime(df.columns.str.split(' ').str[0])
         df = df.transpose()
+        st.write(f"Debug: Dataset loaded. Shape: {df.shape}, Date range: {df.index.min()} to {df.index.max()}")
         return df
     except Exception as e:
         st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
@@ -158,9 +159,15 @@ def get_data(tickers, start, end, custom_data):
 def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
     try:
         period_data = _custom_data.loc[start_date:end_date]
+        if period_data.empty:
+            st.error("No data available for the selected date range.")
+            return []
+        # Exclude benchmark columns
+        exclude_columns = ["Value Weighted Benchmark", "Equally Weighted Benchmark"]
+        valid_columns = [col for col in _custom_data.columns if col not in exclude_columns]
+        valid_stocks = [col for col in valid_columns if not period_data[col].isna().all()]
         st.write(f"Debug: Period data shape: {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
-        valid_stocks = [col for col in _custom_data.columns if period_data[col].notna().any()]
-        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data.")
+        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data: {valid_stocks[:5]}")
         return valid_stocks
     except Exception as e:
         st.error(f"Error filtering valid stocks: {str(e)}")
@@ -266,6 +273,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             return None
         else:
             weights_active = np.where(np.abs(weights_active) < 1e-4, 0, weights_active)
+            Perspective: 0
             weights_active /= np.sum(weights_active)
             
             weights = np.zeros(n)
@@ -419,7 +427,7 @@ def create_pie_chart(assets, values):
 
 def create_bar_chart(assets, values):
     fig = go.Figure(data=[go.Bar(x=assets, y=values)])
-    fig.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", font_family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
     fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
@@ -430,10 +438,10 @@ def create_line_chart(cum_port, cum_value_weighted, cum_equally_weighted):
     fig.add_trace(go.Scatter(x=cum_port.index, y=cum_port, mode='lines', name='Portfolio', line=dict(color='blue')))
     fig.add_trace(go.Scatter(x=cum_value_weighted.index, y=cum_value_weighted, mode='lines', name='Value Weighted Benchmark', line=dict(color='green')))
     fig.add_trace(go.Scatter(x=cum_equally_weighted.index, y=cum_equally_weighted, mode='lines', name='Equally Weighted Benchmark', line=dict(color='red')))
-    fig.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", font_family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
     fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
-    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
+    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", font_family="Times New Roman")))
     return fig
 
 # Export functions
@@ -582,7 +590,7 @@ with tab2:
             st.subheader("Risk Contributions (Latest)")
             st.table(pd.DataFrame({
                 "Asset": results["selected_assets"],
-                "Contribution (%)": results["risk_contrib_pct"].round(2)
+                "Contribution (%)": [risk_contrib_pct].round(2)
             }).set_index("Asset"))
         
         st.plotly_chart(create_pie_chart(results["selected_assets"], results["weights"] * 100), use_container_width=True)
