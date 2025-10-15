@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -418,55 +417,100 @@ with tab1:
         min_date = custom_data.index.min().date()
         max_date = custom_data.index.max().date()
         
-        start_date = st.date_input(
-            "Start Date",
-            min_date,
-            min_value=min_date,
-            max_value=max_date,
-            key="start_date"
-        )
-        end_date = st.date_input(
-            "End Date",
-            max_date,
-            min_value=min_date,
-            max_value=max_date,
-            key="end_date"
-        )
+        # Initialize session state for dates and confirmation
+        if 'dates_confirmed' not in st.session_state:
+            st.session_state.dates_confirmed = False
+        if 'start_date' not in st.session_state:
+            st.session_state.start_date = None
+        if 'end_date' not in st.session_state:
+            st.session_state.end_date = None
         
-        if start_date and end_date:
-            period_data = custom_data.loc[start_date:end_date]
-            complete_stocks = [col for col in custom_data.columns if period_data[col].notna().all()]
-            
-            selected_assets = st.multiselect(
-                "Select US Stocks",
-                options=complete_stocks,
-                key="us_stocks"
+        # Date inputs for month/year
+        st.markdown("### Select Date Range")
+        col1, col2 = st.columns(2)
+        with col1:
+            start_year = st.number_input(
+                "Start Year",
+                min_value=min_date.year,
+                max_value=max_date.year,
+                value=min_date.year,
+                key="start_year"
+            )
+            start_month = st.selectbox(
+                "Start Month",
+                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                index=0,
+                key="start_month"
+            )
+        with col2:
+            end_year = st.number_input(
+                "End Year",
+                min_value=min_date.year,
+                max_value=max_date.year,
+                value=max_date.year,
+                key="end_year"
+            )
+            end_month = st.selectbox(
+                "End Month",
+                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                index=11,
+                key="end_month"
             )
         
-        rebalance_freq = st.selectbox(
-            "Rebalance Frequency",
-            options=['Quarterly', 'Semi-Annually', 'Annually'],
-            index=2
-        )
-        
-        st.markdown("### How to Use")
-        st.write("""
-        - **Set Date Range**: Adjust the start and end dates to analyze historical performance (available range: {} to {}).
-        - **Select Assets**: Choose US stocks from the list of stocks with complete data in the selected range.
-        - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
-        - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
-        - **Explore**: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
-        """.format(min_date.strftime('%Y-%m-%d'), max_date.strftime('%Y-%m-%d')))
-        
-        if st.button("Optimize My Portfolio"):
-            if not selected_assets:
-                st.error("Please select at least one asset to proceed.")
+        # Set dates to first day of selected month/year
+        try:
+            start_date = datetime(start_year, start_month, 1).date()
+            end_date = (datetime(end_year, end_month, 1) + pd.offsets.MonthEnd(0)).date()
+            if start_date > end_date:
+                st.error("Start date must be before end date.")
+            elif end_date > max_date or start_date < min_date:
+                st.error(f"Dates must be within data range: {min_date} to {max_date}.")
             else:
-                with st.spinner("Calculating..."):
-                    results = perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data)
-                    if results:
-                        st.session_state.results = results
-                        st.success("Optimization complete! Check the Portfolio Results tab.")
+                if st.button("Confirm Dates"):
+                    st.session_state.start_date = start_date
+                    st.session_state.end_date = end_date
+                    st.session_state.dates_confirmed = True
+                    st.success("Dates confirmed! Please select assets and rebalance frequency below.")
+        except ValueError:
+            st.error("Invalid date selection. Please choose valid month and year.")
+        
+        # Show stock selection and rebalance frequency only after dates are confirmed
+        if st.session_state.dates_confirmed:
+            period_data = custom_data.loc[st.session_state.start_date:st.session_state.end_date]
+            # Stocks with at least one non-NaN value in the period
+            valid_stocks = [col for col in custom_data.columns if period_data[col].notna().any()]
+            
+            st.markdown("### Select Assets and Rebalance Frequency")
+            selected_assets = st.multiselect(
+                "Select US Stocks",
+                options=valid_stocks,
+                key="us_stocks"
+            )
+            
+            rebalance_freq = st.selectbox(
+                "Rebalance Frequency",
+                options=['Quarterly', 'Semi-Annually', 'Annually'],
+                index=2
+            )
+            
+            st.markdown("### How to Use")
+            st.write("""
+            - **Set Date Range**: Select and confirm the start and end month/year for historical performance analysis.
+            - **Select Assets**: Choose US stocks from the list of stocks with data in the selected range.
+            - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
+            - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
+            - **Explore**: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
+            """)
+            
+            if st.button("Optimize My Portfolio"):
+                if not selected_assets:
+                    st.error("Please select at least one asset to proceed.")
+                else:
+                    with st.spinner("Calculating..."):
+                        results = perform_optimization(selected_assets, st.session_state.start_date, st.session_state.end_date, rebalance_freq, custom_data)
+                        if results:
+                            st.session_state.results = results
+                            st.success("Optimization complete! Check the Portfolio Results tab.")
 
 with tab2:
     st.title("Portfolio Results")
@@ -524,4 +568,3 @@ with tab3:
     
     Thank you for using our tool! 🎉
     """)
-
