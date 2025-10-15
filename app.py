@@ -9,7 +9,7 @@ from fpdf import FPDF
 import io
 from sklearn.covariance import LedoitWolf
 
-# Custom styling for black and white theme
+# Custom styling with pop-up and HELP icon
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
 st.logo("ERC Portfolio.png")
 
@@ -111,6 +111,7 @@ st.markdown(
     }
     header {
         background-color: #000000 !important;
+        position: relative;
     }
     header img {
         height: 60px !important;
@@ -127,7 +128,73 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
+    /* HELP icon in top-right */
+    .help-icon {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        font-size: 24px;
+        color: #f0f0f0;
+        cursor: pointer;
+        z-index: 1000;
+    }
+    /* Pop-up modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1001;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+        background-color: #222222;
+        color: #f0f0f0;
+        margin: 15% auto;
+        padding: 20px;
+        border: 1px solid #f0f0f0;
+        width: 70%;
+        max-width: 600px;
+        border-radius: 8px;
+        font-family: 'Times New Roman', serif;
+    }
+    .close {
+        color: #f0f0f0;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close:hover {
+        color: #dddddd;
+    }
+    #howToUseModal {
+        display: none;
+    }
     </style>
+    <div class="help-icon" onclick="document.getElementById('howToUseModal').style.display='block'">HELP</div>
+    <div id="howToUseModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('howToUseModal').style.display='none'">&times;</span>
+            <h2>How to Use</h2>
+            <p>
+            - <b>Set Date Range</b>: Select and confirm the start and end month/year for historical performance analysis.<br>
+            - <b>Select Assets</b>: Choose US stocks from the list of stocks with data in the selected range.<br>
+            - <b>Rebalance Frequency</b>: Choose quarterly, semi-annually, or annually.<br>
+            - <b>Optimize</b>: Click 'Optimize My Portfolio' to generate your results.<br>
+            - <b>Explore</b>: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
+            </p>
+        </div>
+    </div>
+    <script>
+        // Show modal on first load if not shown before
+        if (!sessionStorage.getItem('modalShown')) {
+            document.getElementById('howToUseModal').style.display = 'block';
+            sessionStorage.setItem('modalShown', 'true');
+        }
+    </script>
     """,
     unsafe_allow_html=True
 )
@@ -248,7 +315,6 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             
             if weights is None:
                 st.error("Initial optimization failed. Please try a different date range or fewer assets.")
-                return None
             else:
                 weights = np.where(np.abs(weights) < 1e-4, 0, weights)
                 weights /= np.sum(weights)
@@ -505,15 +571,6 @@ with tab1:
                 options=['Quarterly', 'Semi-Annually', 'Annually'],
                 index=2
             )
-            
-            st.markdown("### How to Use")
-            st.write("""
-            - **Set Date Range**: Select and confirm the start and end month/year for historical performance analysis.
-            - **Select Assets**: Choose US stocks from the list of stocks with data in the selected range.
-            - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
-            - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
-            - **Explore**: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
-            """)
             
             if st.button("Optimize My Portfolio"):
                 if not selected_assets:
