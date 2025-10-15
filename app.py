@@ -1,6 +1,19 @@
+```python
 import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import cvxpy as cp
+from scipy.optimize import minimize_scalar
+from datetime import datetime, timedelta
+from fpdf import FPDF
+import io
+from sklearn.covariance import LedoitWolf
 
-# Custom styling (full CSS block), with added sidebar hiding
+# Custom styling for black and white theme
+st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
+st.logo("ERC Portfolio.png")
+
 st.markdown(
     """
     <style>
@@ -45,12 +58,10 @@ st.markdown(
     .stPlotlyChart {
         background-color: #000000;
     }
-    /* Ensure date input labels are white */
     .stDateInput label {
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
-    /* Ensure table text is white */
     .stTable {
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
@@ -63,7 +74,6 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
-    /* Style metrics */
     .stMetric {
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
@@ -100,16 +110,13 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
-    /* Make top banner (header) black */
     header {
         background-color: #000000 !important;
     }
-    /* Make logo 4x bigger (default ~24px, so 96px height) */
     header img {
         height: 60px !important;
         width: auto !important;
     }
-    /* Override error messages to use white instead of red */
     div[data-testid="stAlert"] {
         background-color: #111111 !important;
         color: #f0f0f0 !important;
@@ -121,29 +128,400 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
-    /* Hide the sidebar */
-    section[data-testid="stSidebar"] {
-        display: none !important;
-    }
-    .stSidebar {
-        display: none !important;
-    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
-st.logo("ERC Portfolio.png")
+# Data loading functions
+def load_custom_data():
+    try:
+        df = pd.read_csv("Stock_Returns_With_Names_post2000.csv")
+        df.set_index('COMNAM', inplace=True)
+        df.columns = pd.to_datetime(df.columns.str.split(' ').str[0])
+        df = df.transpose()
+        return df
+    except Exception as e:
+        return pd.DataFrame()
 
-# Welcome page content
-st.title("Welcome to Pension Fund Optimizer")
-st.write("""
-This app helps you create equal risk contribution portfolios for your pension fund.
-Navigate to the sections below to get started.
-""")
+def get_data(tickers, start, end, custom_data):
+    try:
+        data = custom_data.loc[start:end, tickers]
+        data = data.dropna()
+        return data
+    except Exception as e:
+        return pd.DataFrame()
 
-# Buttons to link to the other pages
-st.page_link("pages/asset_selection.py", label="Asset Selection")
-st.page_link("pages/portfolio_results.py", label="Portfolio Results")
-st.page_link("pages/about_us.py", label="About Us")
+# Optimization function
+def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):
+    try:
+        lookback_start = start_date - timedelta(days=365)
+        data = get_data(selected_assets, lookback_start, end_date, custom_data)
+        bench_data = get_data(["Value Weighted Benchmark", "Equally Weighted Benchmark"], lookback_start, end_date, custom_data)
+        
+        if data.empty or bench_data.empty:
+            st.error("No data available for the selected assets and date range.")
+            return None
+        
+        returns = data
+        value_weighted_returns = bench_data["Value Weighted Benchmark"]
+        equally_weighted_returns = bench_data["Equally Weighted Benchmark"]
+        
+        period_returns = returns.loc[start_date:end_date]
+        period_value_weighted = value_weighted_returns.loc[start_date:end_date]
+        period_equally_weighted = equally_weighted_returns.loc[start_date:end_date]
+        
+        if len(period_returns) < 2:
+            st.error("Insufficient data points for the selected period.")
+            return None
+        
+        tc_rate = 0.001
+        freq_map = {
+            'Quarterly': 'QS',
+            'Semi-Annually': '6MS',
+            'Annually': 'YS'
+        }
+        freq = freq_map[rebalance_freq]
+        
+        date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
+        rebalance_dates = []
+        for d in date_range:
+            candidates = returns.index[returns.index >= d]
+            if not candidates.empty:
+                rebalance_dates.append(candidates[0])
+        
+        if returns.index[-1] not in rebalance_dates and returns.index[-1] > rebalance_dates[-1]:
+            rebalance_dates.append(returns.index[-1])
+        
+        n = len(selected_assets)
+        previous_weights = np.ones(n) / n
+        port_returns = pd.Series(index=period_returns.index, dtype=float)
+        weights_over_time = {}
+        total_tc = 0.0
+        
+        rebal_date = rebalance_dates[0]
+        est_end = rebal_date - pd.Timedelta(days=1)
+        est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
+        est_returns = returns.loc[est_start:est_end]
+        
+        if len(est_returns) < n + 1:
+            st.error("Insufficient initial estimation data for the first rebalance period.")
+            return None
+        else:
+            mu = est_returns.mean() * 252
+            lw = LedoitWolf().fit(est_returns)
+            S_np = lw.covariance_ * 252
+            mu_np = mu.to_numpy()
+            
+            def solve_with_rho(rho):
+                w = cp.Variable(n)
+                objective = cp.Minimize(cp.quad_form(w, S_np) - rho * cp.sum(cp.log(w)))
+                constraints = [cp.sum(w) == 1, w >= 1e-6]
+                prob = cp.Problem(objective, constraints)
+                prob.solve(solver=cp.ECOS)
+                if prob.status == "optimal":
+                    return w.value
+                return None
+            
+            def get_rc_var(rho):
+                w = solve_with_rho(rho)
+                if w is None:
+                    return np.inf
+                var = w @ S_np @ w
+                sigma = np.sqrt(var)
+                MRC = S_np @ w
+                RC = w * MRC / sigma
+                return np.var(RC)
+            
+            res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
+            best_rho = res.x
+            weights = solve_with_rho(best_rho)
+            
+            if weights is None:
+                st.error("Initial optimization failed. Please try a different date range or fewer assets.")
+                return None
+            else:
+                weights = np.where(np.abs(weights) < 1e-4, 0, weights)
+                weights /= np.sum(weights)
+                
+                turnover = np.sum(np.abs(weights - previous_weights)) / 2
+                cost = turnover * tc_rate
+                total_tc += cost
+                
+                previous_weights = weights
+                weights_over_time[rebal_date] = weights
+        
+        for i in range(1, len(rebalance_dates)):
+            rebal_date = rebalance_dates[i]
+            prev_rebal_date = rebalance_dates[i-1]
+            
+            period_returns_slice = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)]
+            if not period_returns_slice.empty:
+                period_port_ret = period_returns_slice.dot(previous_weights)
+                port_returns.loc[period_returns_slice.index] = period_port_ret
+            
+            est_end = rebal_date - pd.Timedelta(days=1)
+            est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
+            est_returns = returns.loc[est_start:est_end]
+            
+            if len(est_returns) < n + 1:
+                st.warning(f"Insufficient data for rebalance at {rebal_date}. Keeping previous weights.")
+                weights = previous_weights
+                cost = 0
+            else:
+                mu = est_returns.mean() * 252
+                lw = LedoitWolf().fit(est_returns)
+                S_np = lw.covariance_ * 252
+                mu_np = mu.to_numpy()
+                
+                res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
+                best_rho = res.x
+                weights = solve_with_rho(best_rho)
+                
+                if weights is None:
+                    st.warning(f"Optimization failed for rebalance at {rebal_date}. Keeping previous weights.")
+                    weights = previous_weights
+                    cost = 0
+                else:
+                    weights = np.where(np.abs(weights) < 1e-4, 0, weights)
+                    weights /= np.sum(weights)
+                    
+                    delta = weights - previous_weights
+                    turnover = np.sum(np.abs(delta)) / 2
+                    cost = turnover * tc_rate
+                    total_tc += cost
+            
+            weights_over_time[rebal_date] = weights
+            previous_weights = weights
+        
+        last_rebal_date = rebalance_dates[-1]
+        last_period_returns = period_returns.loc[last_rebal_date:]
+        if not last_period_returns.empty:
+            last_port_ret = last_period_returns.dot(previous_weights)
+            port_returns.loc[last_period_returns.index] = last_port_ret
+        
+        port_returns = port_returns.dropna()
+        
+        cum_port = (1 + port_returns).cumprod()
+        cum_value_weighted = (1 + period_value_weighted).cumprod()
+        cum_equally_weighted = (1 + period_equally_weighted).cumprod()
+        
+        ann_return = port_returns.mean() * 252
+        ann_vol = port_returns.std() * np.sqrt(252)
+        sharpe = ann_return / ann_vol if ann_vol > 0 else 0
+        
+        est_returns = returns.iloc[-252:]
+        if len(est_returns) >= n + 1:
+            lw = LedoitWolf().fit(est_returns)
+            S_np = lw.covariance_ * 252
+            port_var = weights @ S_np @ weights
+            sigma = np.sqrt(port_var)
+            MRC = S_np @ weights
+            risk_contrib = weights * MRC / sigma
+            total_risk = np.sum(risk_contrib)
+            risk_contrib_pct = (risk_contrib / total_risk) * 100 if total_risk > 0 else np.zeros(n)
+        else:
+            risk_contrib_pct = np.ones(n) / n * 100
+        
+        weights_df = pd.DataFrame(weights_over_time, index=selected_assets).T * 100
+        frames = []
+        dates = sorted(weights_df.index)
+        for i in range(len(dates)):
+            frame_data = []
+            for asset in selected_assets:
+                frame_data.append(go.Bar(x=selected_assets, y=weights_df.iloc[i], name=asset))
+            frames.append(go.Frame(data=frame_data, name=str(dates[i])))
+        
+        fig_weights = go.Figure(data=[go.Bar(x=selected_assets, y=weights_df.iloc[0], name=asset) for asset in selected_assets],
+                                layout=go.Layout(updatemenus=[dict(type="buttons", buttons=[dict(label="Play", method="animate", args=[None])])],
+                                                 transition_duration=500))
+        fig_weights.frames = frames
+        fig_weights.update_layout(title=dict(text="Weights Evolution Over Time (%)", font=dict(color="#f0f0f0", family="Times New Roman")), paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+        fig_weights.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig_weights.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+        fig_weights.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
+        
+        results = {
+            "selected_assets": selected_assets,
+            "weights": weights,
+            "risk_contrib_pct": risk_contrib_pct,
+            "expected_return": ann_return * 100,
+            "volatility": ann_vol * 100,
+            "sharpe": sharpe,
+            "cum_port": cum_port,
+            "cum_value_weighted": cum_value_weighted,
+            "cum_equally_weighted": cum_equally_weighted,
+            "total_tc": total_tc * 100,
+            "fig_weights": fig_weights,
+            "port_returns": port_returns,
+            "weights_df": weights_df
+        }
+        return results
+    except Exception as e:
+        st.error(f"Optimization error: {str(e)}")
+        return None
+
+# Visualization functions
+def create_pie_chart(assets, values):
+    fig = go.Figure(data=[go.Pie(labels=assets, values=values, hole=0.3, textfont=dict(color="#f0f0f0", family="Times New Roman"))])
+    fig.update_layout(title=dict(text="Portfolio Allocation", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_traces(textfont_color="#f0f0f0")
+    return fig
+
+def create_bar_chart(assets, values):
+    fig = go.Figure(data=[go.Bar(x=assets, y=values)])
+    fig.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+    fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
+    return fig
+
+def create_line_chart(cum_port, cum_value_weighted, cum_equally_weighted):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=cum_port.index, y=cum_port, mode='lines', name='Portfolio', line=dict(color='blue')))
+    fig.add_trace(go.Scatter(x=cum_value_weighted.index, y=cum_value_weighted, mode='lines', name='Value Weighted Benchmark', line=dict(color='green')))
+    fig.add_trace(go.Scatter(x=cum_equally_weighted.index, y=cum_equally_weighted, mode='lines', name='Equally Weighted Benchmark', line=dict(color='red')))
+    fig.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+    fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
+    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
+    return fig
+
+# Export functions
+def export_csv(weights_df, filename):
+    csv = weights_df.to_csv()
+    st.download_button(label="Download Weights History as CSV", data=csv, file_name=filename, mime="text/csv")
+
+def export_pdf(results):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Times", size=12)
+    pdf.cell(200, 10, txt="Portfolio Results", ln=1, align='C')
+    pdf.cell(200, 10, txt=f"Expected Annual Return: {results['expected_return']:.2f}%", ln=1)
+    pdf.cell(200, 10, txt=f"Annual Volatility: {results['volatility']:.2f}%", ln=1)
+    pdf.cell(200, 10, txt=f"Sharpe Ratio: {results['sharpe']:.2f}", ln=1)
+    pdf.cell(200, 10, txt=f"Total Transaction Costs: {results['total_tc']:.2f}%", ln=1)
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+    st.download_button(label="Download Report as PDF", data=pdf_buffer, file_name="portfolio_report.pdf", mime="application/pdf")
+
+# Tabs
+tab1, tab2, tab3 = st.tabs(["Asset Selection", "Portfolio Results", "About Us"])
+
+with tab1:
+    st.title("Asset Selection")
+    custom_data = load_custom_data()
+    if custom_data.empty:
+        st.error("Failed to load the custom dataset. Ensure 'Stock_Returns_With_Names_post2000.csv' is in the root directory.")
+    else:
+        min_date = custom_data.index.min().date()
+        max_date = custom_data.index.max().date()
+        
+        start_date = st.date_input(
+            "Start Date",
+            min_date,
+            min_value=min_date,
+            max_value=max_date,
+            key="start_date"
+        )
+        end_date = st.date_input(
+            "End Date",
+            max_date,
+            min_value=min_date,
+            max_value=max_date,
+            key="end_date"
+        )
+        
+        if start_date and end_date:
+            period_data = custom_data.loc[start_date:end_date]
+            complete_stocks = [col for col in custom_data.columns if period_data[col].notna().all()]
+            
+            selected_assets = st.multiselect(
+                "Select US Stocks",
+                options=complete_stocks,
+                key="us_stocks"
+            )
+        
+        rebalance_freq = st.selectbox(
+            "Rebalance Frequency",
+            options=['Quarterly', 'Semi-Annually', 'Annually'],
+            index=2
+        )
+        
+        st.markdown("### How to Use")
+        st.write("""
+        - **Set Date Range**: Adjust the start and end dates to analyze historical performance (available range: {} to {}).
+        - **Select Assets**: Choose US stocks from the list of stocks with complete data in the selected range.
+        - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
+        - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
+        - **Explore**: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
+        """.format(min_date.strftime('%Y-%m-%d'), max_date.strftime('%Y-%m-%d')))
+        
+        if st.button("Optimize My Portfolio"):
+            if not selected_assets:
+                st.error("Please select at least one asset to proceed.")
+            else:
+                with st.spinner("Calculating..."):
+                    results = perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data)
+                    if results:
+                        st.session_state.results = results
+                        st.success("Optimization complete! Check the Portfolio Results tab.")
+
+with tab2:
+    st.title("Portfolio Results")
+    if "results" in st.session_state:
+        results = st.session_state.results
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Allocation Weights (Latest)")
+            st.table(pd.DataFrame({
+                "Asset": results["selected_assets"],
+                "Weight (%)": [w * 100 for w in results["weights"]]
+            }).set_index("Asset").round(2))
+        with col2:
+            st.subheader("Risk Contributions (Latest)")
+            st.table(pd.DataFrame({
+                "Asset": results["selected_assets"],
+                "Contribution (%)": results["risk_contrib_pct"].round(2)
+            }).set_index("Asset"))
+        
+        st.plotly_chart(create_pie_chart(results["selected_assets"], results["weights"] * 100), use_container_width=True)
+        
+        st.plotly_chart(create_bar_chart(results["selected_assets"], results["risk_contrib_pct"]), use_container_width=True)
+        
+        st.subheader("Performance Metrics")
+        col3, col4, col5, col6 = st.columns(4)
+        col3.metric("Expected Annual Return", f"{results['expected_return']:.2f}%")
+        col4.metric("Annual Volatility", f"{results['volatility']:.2f}%")
+        col5.metric("Sharpe Ratio", f"{results['sharpe']:.2f}")
+        col6.metric("Total Transaction Costs", f"{results['total_tc']:.2f}%")
+        
+        st.subheader("Weights Evolution Over Time")
+        st.plotly_chart(results["fig_weights"], use_container_width=True)
+        
+        st.subheader("Cumulative Returns Comparison")
+        st.plotly_chart(create_line_chart(results["cum_port"], results["cum_value_weighted"], results["cum_equally_weighted"]), use_container_width=True)
+        
+        st.subheader("Export Results")
+        export_csv(results["weights_df"], "weights_history.csv")
+        export_pdf(results)
+    else:
+        st.info("Please select assets and optimize in the Asset Selection tab.")
+
+with tab3:
+    st.title("About Us")
+    st.write("""
+    Welcome to the Pension Fund Optimizer!
+    
+    We are a dedicated team of financial experts and developers passionate about helping individuals and institutions optimize their pension funds for maximum efficiency and risk management.
+    
+    Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time.
+    
+    Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
+    
+    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
+    
+    Thank you for using our tool! 🎉
+    """)
+```
