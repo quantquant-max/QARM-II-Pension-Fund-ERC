@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -524,4 +524,4 @@ with tab3:
     
     Thank you for using our tool! 🎉
     """)
-```
+
