@@ -44,11 +44,7 @@ else:
         index=2
     )
     
-    base_currency = st.selectbox(
-        "Base Currency",
-        options=['USD', 'EUR', 'GBP'],
-        index=0
-    )
+    # Removed base_currency selectbox
     
     # How to Use section (paste from your original)
     st.markdown("### How to Use")
@@ -61,7 +57,7 @@ else:
             st.error("Please select at least one asset to proceed.")
         else:
             with st.spinner("Calculating..."):
-                results = perform_optimization(selected_assets, start_date, end_date, rebalance_freq, base_currency, custom_data)
+                results = perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data)  # Removed base_currency
                 if results:
                     st.session_state.results = results
                     st.success("Optimization complete! Go to Portfolio Results page.")
