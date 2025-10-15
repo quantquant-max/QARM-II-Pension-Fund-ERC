@@ -177,7 +177,9 @@ def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime
         # Filter stocks with non-NaN data on or before start_date
         valid_stocks = [
             col for col in valid_columns
-            if not period_data[col].isna().all() and period_data[col].first_valid_index() is not None and period_data[col].first_valid_index() <= start_date
+            if not period_data[col].isna().all() and 
+            period_data[col].first_valid_index() is not None and 
+            period_data[col].first_valid_index() <= pd.Timestamp(start_date)
         ]
         
         st.write(f"Debug: Period data shape (up to {start_date}): {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
