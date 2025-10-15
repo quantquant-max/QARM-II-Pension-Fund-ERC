@@ -155,10 +155,12 @@ def get_data(tickers, start, end, custom_data):
 
 # Cache valid stocks computation
 @st.cache_data
-def get_valid_stocks(_custom_data, start_date, end_date):
+def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
     try:
         period_data = _custom_data.loc[start_date:end_date]
+        st.write(f"Debug: Period data shape: {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
         valid_stocks = [col for col in _custom_data.columns if period_data[col].notna().any()]
+        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data.")
         return valid_stocks
     except Exception as e:
         st.error(f"Error filtering valid stocks: {str(e)}")
@@ -470,7 +472,7 @@ with tab1:
     st.title("Asset Selection")
     custom_data = load_custom_data()
     if custom_data.empty:
-        st.error("Failed to load the custom dataset. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
+        st.error("Failed to load the custom dataset: Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
     else:
         min_date = datetime(2000, 2, 1).date()  # Dataset starts at 2000-01-31, so first full month is February 2000
         max_date = datetime(2024, 12, 31).date()  # Dataset ends at 2024-12-31
@@ -505,14 +507,14 @@ with tab1:
             start_date_str = st.selectbox(
                 "Start Month/Year",
                 options=date_options,
-                index=0,  # Default to February 2000
+                index=date_options.index("November 2016") if "November 2016" in date_options else 0,  # Default to November 2016
                 key="start_date_str"
             )
         with col2:
             end_date_str = st.selectbox(
                 "End Month/Year",
                 options=date_options,
-                index=len(date_options)-1,  # Default to December 2024
+                index=date_options.index("December 2024") if "December 2024" in date_options else len(date_options)-1,  # Default to December 2024
                 key="end_date_str"
             )
         
