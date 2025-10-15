@@ -138,7 +138,8 @@ def load_custom_data():
     try:
         df = pd.read_csv("Stock_Returns_With_Names_post2000_cleaned.csv")
         df.set_index('COMNAM', inplace=True)
-        df.columns = pd.to_datetime(df.columns.str.split(' ').str[0])
+        # Replace underscores with colons for proper datetime parsing
+        df.columns = pd.to_datetime(df.columns.str.replace('_', ':'))
         df = df.transpose()
         st.write(f"Debug: Dataset loaded. Shape: {df.shape}, Date range: {df.index.min()} to {df.index.max()}")
         return df
@@ -158,16 +159,29 @@ def get_data(tickers, start, end, custom_data):
 @st.cache_data
 def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
     try:
-        period_data = _custom_data.loc[start_date:end_date]
-        if period_data.empty:
-            st.error("No data available for the selected date range.")
+        # Ensure the DataFrame is not empty
+        if _custom_data.empty:
+            st.error("Custom data is empty.")
             return []
+        
+        # Get data up to start_date to check for non-NaN data
+        period_data = _custom_data.loc[:start_date]
+        if period_data.empty:
+            st.error(f"No data available up to start date {start_date}.")
+            return []
+        
         # Exclude benchmark columns
         exclude_columns = ["Value Weighted Benchmark", "Equally Weighted Benchmark"]
         valid_columns = [col for col in _custom_data.columns if col not in exclude_columns]
-        valid_stocks = [col for col in valid_columns if not period_data[col].isna().all()]
-        st.write(f"Debug: Period data shape: {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
-        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data: {valid_stocks[:5]}")
+        
+        # Filter stocks with non-NaN data on or before start_date
+        valid_stocks = [
+            col for col in valid_columns
+            if not period_data[col].isna().all() and period_data[col].first_valid_index() is not None and period_data[col].first_valid_index() <= start_date
+        ]
+        
+        st.write(f"Debug: Period data shape (up to {start_date}): {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
+        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data on or before {start_date}: {valid_stocks[:5] if valid_stocks else []}")
         return valid_stocks
     except Exception as e:
         st.error(f"Error filtering valid stocks: {str(e)}")
@@ -273,7 +287,6 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             return None
         else:
             weights_active = np.where(np.abs(weights_active) < 1e-4, 0, weights_active)
-            Perspective: 0
             weights_active /= np.sum(weights_active)
             
             weights = np.zeros(n)
@@ -427,7 +440,7 @@ def create_pie_chart(assets, values):
 
 def create_bar_chart(assets, values):
     fig = go.Figure(data=[go.Bar(x=assets, y=values)])
-    fig.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", font_family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_layout(title=dict(text="Risk Contributions", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Assets", yaxis_title="Percentage", paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
     fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
@@ -438,10 +451,10 @@ def create_line_chart(cum_port, cum_value_weighted, cum_equally_weighted):
     fig.add_trace(go.Scatter(x=cum_port.index, y=cum_port, mode='lines', name='Portfolio', line=dict(color='blue')))
     fig.add_trace(go.Scatter(x=cum_value_weighted.index, y=cum_value_weighted, mode='lines', name='Value Weighted Benchmark', line=dict(color='green')))
     fig.add_trace(go.Scatter(x=cum_equally_weighted.index, y=cum_equally_weighted, mode='lines', name='Equally Weighted Benchmark', line=dict(color='red')))
-    fig.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", font_family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
+    fig.update_layout(title=dict(text="Cumulative Returns", font=dict(color="#f0f0f0", family="Times New Roman")), title_x=0.5, xaxis_title="Date", yaxis_title="Cumulative Return", paper_bgcolor="#000000", plot_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
     fig.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
     fig.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
-    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", font_family="Times New Roman")))
+    fig.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
     return fig
 
 # Export functions
@@ -470,7 +483,7 @@ with tab0:
     st.title("How to Use")
     st.write("""
     - **Set Date Range**: Select and confirm the start and end month/year for historical performance analysis.
-    - **Select Assets**: Choose US stocks from the list of stocks with data in the selected range.
+    - **Select Assets**: Choose US stocks from the list of stocks with data in the selected range. Only stocks listed on or before the start date are available.
     - **Rebalance Frequency**: Choose quarterly, semi-annually, or annually.
     - **Optimize**: Click 'Optimize My Portfolio' to generate your results.
     - **Explore**: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
@@ -515,14 +528,14 @@ with tab1:
             start_date_str = st.selectbox(
                 "Start Month/Year",
                 options=date_options,
-                index=date_options.index("November 2016") if "November 2016" in date_options else 0,  # Default to November 2016
+                index=date_options.index("January 2018") if "January 2018" in date_options else 0,  # Default to January 2018
                 key="start_date_str"
             )
         with col2:
             end_date_str = st.selectbox(
                 "End Month/Year",
                 options=date_options,
-                index=date_options.index("December 2024") if "December 2024" in date_options else len(date_options)-1,  # Default to December 2024
+                index=date_options.index("December 2021") if "December 2021" in date_options else len(date_options)-1,  # Default to December 2021
                 key="end_date_str"
             )
         
@@ -550,7 +563,7 @@ with tab1:
         # Show stock selection and rebalance frequency only after dates are confirmed
         if st.session_state.dates_confirmed:
             if not st.session_state.valid_stocks:
-                st.warning("No valid stocks found for the selected date range. Try a different range.")
+                st.warning("No valid stocks found for the selected date range. Try a different range or check the dataset.")
             else:
                 st.markdown("### Select Assets and Rebalance Frequency")
                 selected_assets = st.multiselect(
@@ -590,7 +603,7 @@ with tab2:
             st.subheader("Risk Contributions (Latest)")
             st.table(pd.DataFrame({
                 "Asset": results["selected_assets"],
-                "Contribution (%)": [risk_contrib_pct].round(2)
+                "Contribution (%)": results["risk_contrib_pct"].round(2)
             }).set_index("Asset"))
         
         st.plotly_chart(create_pie_chart(results["selected_assets"], results["weights"] * 100), use_container_width=True)
