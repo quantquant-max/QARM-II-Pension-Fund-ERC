@@ -141,7 +141,6 @@ def load_custom_data():
         df = df.apply(pd.to_numeric, errors='coerce')  # Ensure numeric, coerce errors to NaN
         df.columns = pd.to_datetime(df.columns.str.replace('_', ':'))
         df = df.transpose()
-        st.write(f"Debug: Dataset loaded. Shape: {df.shape}, Date range: {df.index.min()} to {df.index.max()}")
         return df
     except Exception as e:
         st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
@@ -155,31 +154,14 @@ def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime
             st.error("Custom data is empty.")
             return []
         
-        # Get data up to start_date to check for non-NaN data
-        period_data = _custom_data.loc[:start_date]
-        if period_data.empty:
-            st.error(f"No data available up to start date {start_date}.")
-            return []
-        
         # Exclude benchmark columns
         exclude_columns = ["Value Weighted Benchmark", "Equally Weighted Benchmark"]
-        valid_columns = [col for col in _custom_data.columns if col not in exclude_columns]
+        valid_stocks = [col for col in _custom_data.columns if col not in exclude_columns]
         
-        # Filter stocks with non-NaN data on or before start_date
-        valid_stocks = [
-            col for col in valid_columns
-            if period_data[col].notna().any() and 
-            period_data[col].first_valid_index() is not None and 
-            period_data[col].first_valid_index() <= pd.Timestamp(start_date)
-        ]
-        
-        st.write(f"Debug: Period data shape (up to {start_date}): {period_data.shape}, Index range: {period_data.index.min()} to {period_data.index.max()}")
-        st.write(f"Debug: Found {len(valid_stocks)} valid stocks with non-NaN data on or before {start_date}: {valid_stocks[:5] if valid_stocks else []}")
         return valid_stocks
     except Exception as e:
-        st.error(f"Error filtering valid stocks: {str(e)}")
+        st.error(f"Error retrieving stock list: {str(e)}")
         return []
-
 # Optimization function with rolling universe
 def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):
     try:
