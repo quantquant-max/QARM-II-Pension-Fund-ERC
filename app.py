@@ -137,7 +137,7 @@ st.markdown(
 def load_custom_data():
     try:
         df = pd.read_csv("Stock_Returns_With_Names_post2000_cleaned.csv")
-        df.set_index('COMNAM', inplace=True)
+        df.set_index('Company_Ticker', inplace=True)
         df = df.apply(pd.to_numeric, errors='coerce')  # Ensure numeric, coerce errors to NaN
         df.columns = pd.to_datetime(df.columns.str.replace('_', ':'))
         df = df.transpose()
