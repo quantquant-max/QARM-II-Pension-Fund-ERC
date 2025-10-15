@@ -9,7 +9,7 @@ from fpdf import FPDF
 import io
 from sklearn.covariance import LedoitWolf
 
-# Custom styling with pop-up and HELP icon
+# Custom styling with pop-up and HELP button
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
 st.logo("ERC Portfolio.png")
 
@@ -128,76 +128,72 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
-    /* HELP icon in top-right */
-    .help-icon {
-        position: absolute;
-        top: 10px;
-        right: 20px;
-        font-size: 24px;
-        color: #f0f0f0;
-        cursor: pointer;
-        z-index: 1000;
-    }
-    /* Pop-up modal */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1001;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.5);
-    }
-    .modal-content {
+    /* Pop-up container */
+    .popup-container {
         background-color: #222222;
         color: #f0f0f0;
-        margin: 15% auto;
+        margin: 10% auto;
         padding: 20px;
         border: 1px solid #f0f0f0;
         width: 70%;
         max-width: 600px;
         border-radius: 8px;
         font-family: 'Times New Roman', serif;
+        position: relative;
+        z-index: 1000;
     }
-    .close {
+    .popup-close {
         color: #f0f0f0;
-        float: right;
+        position: absolute;
+        top: 10px;
+        right: 20px;
         font-size: 28px;
         font-weight: bold;
         cursor: pointer;
     }
-    .close:hover {
-        color: #dddddd;
-    }
-    #howToUseModal {
-        display: none;
-    }
     </style>
-    <div class="help-icon" onclick="document.getElementById('howToUseModal').style.display='block'">HELP</div>
-    <div id="howToUseModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="document.getElementById('howToUseModal').style.display='none'">&times;</span>
-            <h2>How to Use</h2>
-            <p>
-            - <b>Set Date Range</b>: Select and confirm the start and end month/year for historical performance analysis.<br>
-            - <b>Select Assets</b>: Choose US stocks from the list of stocks with data in the selected range.<br>
-            - <b>Rebalance Frequency</b>: Choose quarterly, semi-annually, or annually.<br>
-            - <b>Optimize</b>: Click 'Optimize My Portfolio' to generate your results.<br>
-            - <b>Explore</b>: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
-            </p>
-        </div>
-    </div>
-    <script>
-        // Show modal on first load if not shown before
-        if (!sessionStorage.getItem('modalShown')) {
-            document.getElementById('howToUseModal').style.display = 'block';
-            sessionStorage.setItem('modalShown', 'true');
-        }
-    </script>
     """,
     unsafe_allow_html=True
 )
+
+# Initialize session state for pop-up
+if 'show_popup' not in st.session_state:
+    st.session_state.show_popup = True  # Show on first load
+if 'help_clicked' not in st.session_state:
+    st.session_state.help_clicked = False
+
+# HELP button in top-right
+st.markdown(
+    """
+    <div style="position: absolute; top: 10px; right: 20px; z-index: 999;">
+        <button class="stButton" style="background-color: #f0f0f0; color: #000000; border-radius: 8px; padding: 5px 10px; font-family: 'Times New Roman', serif;" onclick="st.session_state.help_clicked = true; st.session_state.show_popup = true;">HELP</button>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# Pop-up logic
+if st.session_state.show_popup or st.session_state.help_clicked:
+    with st.container():
+        st.markdown(
+            """
+            <div class="popup-container">
+                <span class="popup-close" onclick="st.session_state.show_popup = false; st.session_state.help_clicked = false;">&times;</span>
+                <h2 style="font-family: 'Times New Roman', serif; color: #f0f0f0;">How to Use</h2>
+                <p style="font-family: 'Times New Roman', serif; color: #f0f0f0;">
+                - <b>Set Date Range</b>: Select and confirm the start and end month/year for historical performance analysis.<br>
+                - <b>Select Assets</b>: Choose US stocks from the list of stocks with data in the selected range.<br>
+                - <b>Rebalance Frequency</b>: Choose quarterly, semi-annually, or annually.<br>
+                - <b>Optimize</b>: Click 'Optimize My Portfolio' to generate your results.<br>
+                - <b>Explore</b>: Review weights, risk contributions, and performance metrics in the Portfolio Results tab.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        if st.button("Close", key="close_popup"):
+            st.session_state.show_popup = False
+            st.session_state.help_clicked = False
 
 # Data loading functions
 def load_custom_data():
