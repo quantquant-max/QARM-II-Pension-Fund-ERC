@@ -138,7 +138,7 @@ def load_custom_data():
     try:
         df = pd.read_csv("Stock_Returns_With_Names_post2000_cleaned.csv")
         df.set_index('COMNAM', inplace=True)
-        # Replace underscores with colons for proper datetime parsing
+        df = df.apply(pd.to_numeric, errors='coerce')  # Ensure numeric, coerce errors to NaN
         df.columns = pd.to_datetime(df.columns.str.replace('_', ':'))
         df = df.transpose()
         st.write(f"Debug: Dataset loaded. Shape: {df.shape}, Date range: {df.index.min()} to {df.index.max()}")
@@ -147,15 +147,6 @@ def load_custom_data():
         st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
         return pd.DataFrame()
 
-def get_data(tickers, start, end, custom_data):
-    try:
-        data = custom_data.loc[start:end, tickers]
-        # No dropna to allow NaN for rolling universe
-        return data
-    except Exception as e:
-        return pd.DataFrame()
-
-# Cache valid stocks computation
 @st.cache_data
 def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
     try:
@@ -177,7 +168,7 @@ def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime
         # Filter stocks with non-NaN data on or before start_date
         valid_stocks = [
             col for col in valid_columns
-            if not period_data[col].isna().all() and 
+            if period_data[col].notna().any() and 
             period_data[col].first_valid_index() is not None and 
             period_data[col].first_valid_index() <= pd.Timestamp(start_date)
         ]
