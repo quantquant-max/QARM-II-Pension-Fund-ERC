@@ -135,7 +135,7 @@ st.markdown(
 # Data loading functions
 def load_custom_data():
     try:
-        df = pd.read_csv("Stock_Returns_With_Names_post2000.csv")
+        df = pd.read_csv("Stock_Returns_With_Names_post2000_cleaned.csv")
         df.set_index('COMNAM', inplace=True)
         df.columns = pd.to_datetime(df.columns.str.split(' ').str[0])
         df = df.transpose()
@@ -203,7 +203,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             rebalance_dates.append(returns.index[-1])
         
         n = len(selected_assets)
-        previous_weights = np.zeros(n)  # Start with zero
+        previous_weights = np.zeros(n)  # Start with zero weights
         port_returns = pd.Series(index=period_returns.index, dtype=float)
         weights_over_time = {}
         total_tc = 0.0
@@ -214,7 +214,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
         est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
         est_returns = returns.loc[est_start:est_end]
         
-        active_assets = [asset for i, asset in enumerate(selected_assets) if not est_returns[asset].isna().all()]
+        active_assets = [asset for asset in selected_assets if not est_returns[asset].isna().all()]
         n_active = len(active_assets)
         
         if n_active == 0:
@@ -264,9 +264,9 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             weights_active /= np.sum(weights_active)
             
             weights = np.zeros(n)
-            for ii, asset in enumerate(active_assets):
+            for i, asset in enumerate(active_assets):
                 idx = selected_assets.index(asset)
-                weights[idx] = weights_active[ii]
+                weights[idx] = weights_active[i]
             
             turnover = np.sum(np.abs(weights - previous_weights)) / 2
             cost = turnover * tc_rate
@@ -280,7 +280,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             rebal_date = rebalance_dates[i]
             prev_rebal_date = rebalance_dates[i-1]
             
-            # Period returns, fill NaN with 0
+            # Period returns, fill NaN with 0 for inactive assets
             period_returns_slice = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)].fillna(0)
             if not period_returns_slice.empty:
                 period_port_ret = period_returns_slice.dot(previous_weights)
@@ -324,9 +324,9 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
                         weights_active /= np.sum(weights_active)
                         
                         weights = np.zeros(n)
-                        for ii, asset in enumerate(active_assets):
+                        for i, asset in enumerate(active_assets):
                             idx = selected_assets.index(asset)
-                            weights[idx] = weights_active[ii]
+                            weights[idx] = weights_active[i]
                         
                         turnover = np.sum(np.abs(weights - previous_weights)) / 2
                         cost = turnover * tc_rate
@@ -342,7 +342,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
             last_port_ret = last_period_returns.dot(previous_weights)
             port_returns.loc[last_period_returns.index] = last_port_ret
         
-        # Drop NaN in port_returns (shouldn't have any now)
+        # Drop NaN in port_returns (shouldn't have any due to fillna)
         port_returns = port_returns.dropna()
         
         # Cumulative
@@ -467,22 +467,20 @@ with tab1:
     st.title("Asset Selection")
     custom_data = load_custom_data()
     if custom_data.empty:
-        st.error("Failed to load the custom dataset. Ensure 'Stock_Returns_With_Names_post2000.csv' is in the root directory.")
+        st.error("Failed to load the custom dataset. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
     else:
-        min_date = custom_data.index.min().date()
-        max_date = custom_data.index.max().date()
+        min_date = datetime(2000, 2, 1).date()  # Dataset starts at 2000-01-31, so first full month is February 2000
+        max_date = datetime(2024, 12, 31).date()  # Dataset ends at 2024-12-31
         
         # Generate month/year options
         month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
                        'July', 'August', 'September', 'October', 'November', 'December']
         date_options = []
         date_to_str = {}
-        for year in range(min_date.year, max_date.year + 1):
-            for month in range(1, 13):
-                if year == min_date.year and month < min_date.month:
-                    continue
-                if year == max_date.year and month > max_date.month:
-                    break
+        for year in range(2000, 2025):
+            start_month = 2 if year == 2000 else 1  # Start at February 2000
+            end_month = 12 if year < 2024 else 12  # End at December 2024
+            for month in range(start_month, end_month + 1):
                 date_str = f"{month_names[month-1]} {year}"
                 date_options.append(date_str)
                 date_to_str[date_str] = (year, month)
@@ -504,14 +502,14 @@ with tab1:
             start_date_str = st.selectbox(
                 "Start Month/Year",
                 options=date_options,
-                index=0,
+                index=0,  # Default to February 2000
                 key="start_date_str"
             )
         with col2:
             end_date_str = st.selectbox(
                 "End Month/Year",
                 options=date_options,
-                index=len(date_options)-1,
+                index=len(date_options)-1,  # Default to December 2024
                 key="end_date_str"
             )
         
@@ -525,7 +523,7 @@ with tab1:
             if start_date > end_date:
                 st.error("Start date must be before end date.")
             elif end_date > max_date or start_date < min_date:
-                st.error(f"Dates must be within data range: {min_date} to {max_date}.")
+                st.error(f"Dates must be within data range: 2000-02-01 to 2024-12-31.")
             else:
                 if st.button("Confirm Dates"):
                     st.session_state.start_date = start_date
