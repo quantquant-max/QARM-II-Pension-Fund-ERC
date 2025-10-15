@@ -6,8 +6,9 @@ from sklearn.covariance import LedoitWolf
 from datetime import timedelta
 import streamlit as st
 from utils.data_loader import get_data
+import plotly.graph_objects as go
 
-def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, base_currency, custom_data):
+def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):  # Removed base_currency
     try:
         lookback_start = start_date - timedelta(days=365)
         data = get_data(selected_assets, lookback_start, end_date, custom_data)
@@ -21,18 +22,7 @@ def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, 
         value_weighted_returns = bench_data["Value Weighted Benchmark"]
         equally_weighted_returns = bench_data["Equally Weighted Benchmark"]
         
-        # Multi-currency: Convert to base currency if not USD
-        if base_currency != 'USD':
-            forex_ticker = f"{base_currency}USD=X"
-            forex_data = get_data([forex_ticker], lookback_start, end_date)
-            if forex_data.empty:
-                st.error(f"Unable to fetch forex data for {base_currency}.")
-                return None
-            else:
-                forex_returns = forex_data[forex_ticker].pct_change().dropna()
-                returns = returns.div(forex_returns, axis=0).dropna()
-                value_weighted_returns = value_weighted_returns.div(forex_returns).dropna()
-                equally_weighted_returns = equally_weighted_returns.div(forex_returns).dropna()
+        # Removed multi-currency block entirely
         
         period_returns = returns.loc[start_date:end_date]
         period_value_weighted = value_weighted_returns.loc[start_date:end_date]
