@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -141,6 +142,7 @@ def load_custom_data():
         df = df.transpose()
         return df
     except Exception as e:
+        st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
         return pd.DataFrame()
 
 def get_data(tickers, start, end, custom_data):
