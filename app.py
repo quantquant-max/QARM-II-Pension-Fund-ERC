@@ -160,7 +160,8 @@ def get_valid_stocks(_custom_data, start_date, end_date):
         period_data = _custom_data.loc[start_date:end_date]
         valid_stocks = [col for col in _custom_data.columns if period_data[col].notna().any()]
         return valid_stocks
-    except Exception:
+    except Exception as e:
+        st.error(f"Error filtering valid stocks: {str(e)}")
         return []
 
 # Optimization function with rolling universe
@@ -532,34 +533,37 @@ with tab1:
                     st.session_state.end_date = end_date
                     st.session_state.valid_stocks = get_valid_stocks(custom_data, start_date, end_date)
                     st.session_state.dates_confirmed = True
-                    st.success("Dates confirmed! Please select assets and rebalance frequency below.")
+                    st.success(f"Dates confirmed! Found {len(st.session_state.valid_stocks)} valid stocks. Please select assets and rebalance frequency below.")
         except Exception:
             st.error("Invalid date selection. Please choose valid month and year.")
         
         # Show stock selection and rebalance frequency only after dates are confirmed
         if st.session_state.dates_confirmed:
-            st.markdown("### Select Assets and Rebalance Frequency")
-            selected_assets = st.multiselect(
-                "Select US Stocks",
-                options=st.session_state.valid_stocks,
-                key="us_stocks"
-            )
-            
-            rebalance_freq = st.selectbox(
-                "Rebalance Frequency",
-                options=['Quarterly', 'Semi-Annually', 'Annually'],
-                index=2
-            )
-            
-            if st.button("Optimize My Portfolio"):
-                if not selected_assets:
-                    st.error("Please select at least one asset to proceed.")
-                else:
-                    with st.spinner("Calculating..."):
-                        results = perform_optimization(selected_assets, st.session_state.start_date, st.session_state.end_date, rebalance_freq, custom_data)
-                        if results:
-                            st.session_state.results = results
-                            st.success("Optimization complete! Check the Portfolio Results tab.")
+            if not st.session_state.valid_stocks:
+                st.warning("No valid stocks found for the selected date range. Try a different range.")
+            else:
+                st.markdown("### Select Assets and Rebalance Frequency")
+                selected_assets = st.multiselect(
+                    "Select US Stocks",
+                    options=st.session_state.valid_stocks,
+                    key="us_stocks"
+                )
+                
+                rebalance_freq = st.selectbox(
+                    "Rebalance Frequency",
+                    options=['Quarterly', 'Semi-Annually', 'Annually'],
+                    index=2
+                )
+                
+                if st.button("Optimize My Portfolio"):
+                    if not selected_assets:
+                        st.error("Please select at least one asset to proceed.")
+                    else:
+                        with st.spinner("Calculating..."):
+                            results = perform_optimization(selected_assets, st.session_state.start_date, st.session_state.end_date, rebalance_freq, custom_data)
+                            if results:
+                                st.session_state.results = results
+                                st.success("Optimization complete! Check the Portfolio Results tab.")
 
 with tab2:
     st.title("Portfolio Results")
