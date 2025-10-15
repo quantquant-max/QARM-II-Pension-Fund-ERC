@@ -1,7 +1,6 @@
 streamlit
 pandas
 numpy
-yfinance
 plotly
 cvxpy
 scipy
