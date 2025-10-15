@@ -151,6 +151,16 @@ def get_data(tickers, start, end, custom_data):
     except Exception as e:
         return pd.DataFrame()
 
+# Cache valid stocks computation
+@st.cache_data
+def get_valid_stocks(_custom_data, start_date, end_date):
+    try:
+        period_data = _custom_data.loc[start_date:end_date]
+        valid_stocks = [col for col in _custom_data.columns if period_data[col].notna().any()]
+        return valid_stocks
+    except Exception:
+        return []
+
 # Optimization function
 def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):
     try:
@@ -417,50 +427,56 @@ with tab1:
         min_date = custom_data.index.min().date()
         max_date = custom_data.index.max().date()
         
-        # Initialize session state for dates and confirmation
+        # Generate month/year options
+        month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December']
+        date_options = []
+        date_to_str = {}
+        for year in range(min_date.year, max_date.year + 1):
+            for month in range(1, 13):
+                if year == min_date.year and month < min_date.month:
+                    continue
+                if year == max_date.year and month > max_date.month:
+                    break
+                date_str = f"{month_names[month-1]} {year}"
+                date_options.append(date_str)
+                date_to_str[date_str] = (year, month)
+        
+        # Initialize session state
         if 'dates_confirmed' not in st.session_state:
             st.session_state.dates_confirmed = False
         if 'start_date' not in st.session_state:
             st.session_state.start_date = None
         if 'end_date' not in st.session_state:
             st.session_state.end_date = None
+        if 'valid_stocks' not in st.session_state:
+            st.session_state.valid_stocks = []
         
-        # Date inputs for month/year
+        # Date inputs
         st.markdown("### Select Date Range")
         col1, col2 = st.columns(2)
         with col1:
-            start_year = st.number_input(
-                "Start Year",
-                min_value=min_date.year,
-                max_value=max_date.year,
-                value=min_date.year,
-                key="start_year"
-            )
-            start_month = st.selectbox(
-                "Start Month",
-                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            start_date_str = st.selectbox(
+                "Start Month/Year",
+                options=date_options,
                 index=0,
-                key="start_month"
+                key="start_date_str"
             )
         with col2:
-            end_year = st.number_input(
-                "End Year",
-                min_value=min_date.year,
-                max_value=max_date.year,
-                value=max_date.year,
-                key="end_year"
-            )
-            end_month = st.selectbox(
-                "End Month",
-                options=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                index=11,
-                key="end_month"
+            end_date_str = st.selectbox(
+                "End Month/Year",
+                options=date_options,
+                index=len(date_options)-1,
+                key="end_date_str"
             )
         
-        # Set dates to first day of selected month/year
+        # Convert selected strings to dates
         try:
+            start_year, start_month = date_to_str[start_date_str]
+            end_year, end_month = date_to_str[end_date_str]
             start_date = datetime(start_year, start_month, 1).date()
             end_date = (datetime(end_year, end_month, 1) + pd.offsets.MonthEnd(0)).date()
+            
             if start_date > end_date:
                 st.error("Start date must be before end date.")
             elif end_date > max_date or start_date < min_date:
@@ -469,21 +485,18 @@ with tab1:
                 if st.button("Confirm Dates"):
                     st.session_state.start_date = start_date
                     st.session_state.end_date = end_date
+                    st.session_state.valid_stocks = get_valid_stocks(custom_data, start_date, end_date)
                     st.session_state.dates_confirmed = True
                     st.success("Dates confirmed! Please select assets and rebalance frequency below.")
-        except ValueError:
+        except Exception:
             st.error("Invalid date selection. Please choose valid month and year.")
         
         # Show stock selection and rebalance frequency only after dates are confirmed
         if st.session_state.dates_confirmed:
-            period_data = custom_data.loc[st.session_state.start_date:st.session_state.end_date]
-            # Stocks with at least one non-NaN value in the period
-            valid_stocks = [col for col in custom_data.columns if period_data[col].notna().any()]
-            
             st.markdown("### Select Assets and Rebalance Frequency")
             selected_assets = st.multiselect(
                 "Select US Stocks",
-                options=valid_stocks,
+                options=st.session_state.valid_stocks,
                 key="us_stocks"
             )
             
