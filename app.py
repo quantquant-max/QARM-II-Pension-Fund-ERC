@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -146,6 +145,15 @@ def load_custom_data():
         st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
         return pd.DataFrame()
 
+def get_data(tickers, start, end, custom_data):
+    try:
+        data = custom_data.loc[start:end, tickers]
+        # No dropna to allow NaN for rolling universe
+        return data
+    except Exception as e:
+        return pd.DataFrame()
+
+# Cache valid stocks computation
 @st.cache_data
 def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
     try:
@@ -162,6 +170,7 @@ def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime
     except Exception as e:
         st.error(f"Error retrieving stock list: {str(e)}")
         return []
+
 # Optimization function with rolling universe
 def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):
     try:
