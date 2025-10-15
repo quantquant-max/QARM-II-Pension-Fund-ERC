@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Custom styling (full CSS block)
+# Custom styling (full CSS block), with added sidebar hiding
 st.markdown(
     """
     <style>
@@ -121,6 +121,13 @@ st.markdown(
         color: #f0f0f0 !important;
         font-family: 'Times New Roman', serif;
     }
+    /* Hide the sidebar */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
+    .stSidebar {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -128,3 +135,15 @@ st.markdown(
 
 st.set_page_config(page_title="Pension Fund Optimizer", layout="wide")
 st.logo("ERC Portfolio.png")
+
+# Welcome page content
+st.title("Welcome to Pension Fund Optimizer")
+st.write("""
+This app helps you create equal risk contribution portfolios for your pension fund.
+Navigate to the sections below to get started.
+""")
+
+# Buttons to link to the other pages
+st.page_link("pages/asset_selection.py", label="Asset Selection")
+st.page_link("pages/portfolio_results.py", label="Portfolio Results")
+st.page_link("pages/about_us.py", label="About Us")
