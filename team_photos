@@ -8,6 +8,7 @@ Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk 
 
 
 Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
+
 If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com. 
 
 Thank you for using our tool! 🎉 """)
@@ -17,4 +18,19 @@ Thank you for using our tool! 🎉 """)
     with col1:
         st.image("team_photos/audrey.jpg", caption="Audrey Champion - CEO", use_container_width=True)
         st.markdown("[LinkedIn]("https://www.linkedin.com/in/audrey-champion-103b16247/")
+
+# Responsive grid layout
+    cols = st.columns(len(team))
+    for i, member in enumerate(team):
+        with cols[i]:
+            st.image(member["img"], width=150)
+            st.markdown(f"**{member['name']}**")
+            st.markdown(f"_{member['role']}_")
+            st.markdown(f"<p style='font-size:14px; color:#cccccc; text-align:justify'>{member['bio']}</p>", unsafe_allow_html=True)
+
+    st.markdown("""
+    ---
+    For questions or collaboration opportunities, feel free to reach out at  
+    📧 **support@pensionoptimizer.com**
+    """)
     
