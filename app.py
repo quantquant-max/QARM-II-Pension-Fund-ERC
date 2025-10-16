@@ -629,3 +629,41 @@ with tab3:
     Thank you for using our tool! 🎉 
     """)
 
+    st.markdown("---")
+
+    st.subheader("👥 Meet the Team")
+
+    # Team grid
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.image("team_photos/Rihem-RHAIEM.jpg", caption="Rihem Rhaiem — Quant Researcher", width=220)
+        st.write("[LinkedIn](https://www.linkedin.com/in/rihem-rhaiem-318577225/)")
+
+    with col2:
+        st.image("team_photos/Audrey-CHAMPION.jpg", caption="Audrey Champion — Financial Data Scientist", width=220)
+        st.write("[LinkedIn](https://www.linkedin.com/in/audrey-champion-103b16247/)")
+
+    with col3:
+        st.image("team_photos/Lucas-JACCARD.jpg", caption="Lucas Jaccard — Portfolio Strategist", width=220)
+        st.write("[LinkedIn](https://www.linkedin.com/in/lucas-jaccard-420b64190/)")
+    
+    st.markdown("---")
+
+    st.write("""
+    🧭 *Our Vision*  
+    To bring transparency, risk control, and advanced optimization techniques into the hands of pension fund managers and individual investors.
+
+    💡 *Technology Stack*  
+    Built with [Streamlit](https://streamlit.io/), [Plotly](https://plotly.com/python/), and [Python](https://www.python.org/),
+    the application uses advanced portfolio optimization (Dynamic Equal Risk Contribution) to ensure risk parity across time.
+
+    📧 *Contact us:*  
+    support@pensionoptimizer.com
+    """)
+
+    st.markdown("---")
+
+    st.success("Thank you for using our Pension Fund Optimizer! 🎉")
+
+
