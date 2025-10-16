@@ -629,81 +629,45 @@ with tab3:
     Thank you for using our tool! 🎉 
     """)
 
-    st.markdown("---")
-    st.subheader("Meet the Team")
-
     team = [
-        {"name": "Rihem Rhaiem", "role": "Project Lead & Quant Researcher",
-         "bio": "Specialized in portfolio theory and optimization, Rihem led the ERC model design and supervised the integration of quantitative finance concepts.",
-         "img": "team_photos/Rihem-RHAIEM.jpg"},
-        {"name": "Audrey Champion", "role": "Data Science & Visualization",
-         "bio": "Audrey focused on financial data preprocessing and developed interactive dashboards for portfolio insights.",
-         "img": "team_photos/Audrey-CHAMPION.jpg"},
-        {"name": "Arda Budak", "role": "Optimization & Model Engineering",
-         "bio": "Arda implemented and optimized the ERC formulation, ensuring stability and computational efficiency.",
-         "img": "team_photos/Arda-BUDAK.jpg"},
-        {"name": "Edward Arion", "role": "UI/UX & System Design",
-         "bio": "Edward designed the user interface and contributed to an intuitive visualization experience.",
-         "img": "team_photos/Edward-ARION.jpg"},
-        {"name": "Lucas Jaccard", "role": "Economic & Strategic Analysis",
-         "bio": "Lucas provided market and macro insights linking theory with applied asset management.",
-         "img": "team_photos/Lucas-JACCARD.jpg"}
+        {
+            "name": "Rihem Rhaiem",
+            "role": "Data Scientist",
+            "desc": "Rihem specializes in financial data analytics and portfolio optimization models, contributing quantitative insight to the ERC framework.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Rihem-RHAIEM.jpg"
+        },
+        {
+            "name": "Audrey Champion",
+            "role": "Financial Engineer",
+            "desc": "Audrey focuses on translating theory into practice, helping design the pension fund strategy and ensuring academic rigor in implementation.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Audrey-CHAMPION.jpg"
+        },
+        {
+            "name": "Arda Budak",
+            "role": "Quantitative Analyst",
+            "desc": "Arda applies quantitative methods and stochastic simulations to enhance risk control and portfolio diversification within the project.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Arda-BUDAK.jpg"
+        },
+        {
+            "name": "Edward Arion",
+            "role": "Backend Developer",
+            "desc": "Edward ensures computational stability and performance, integrating optimization algorithms efficiently within the Streamlit app.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Edward-ARION.jpg"
+        },
+        {
+            "name": "Lucas Jaccard",
+            "role": "Frontend Developer",
+            "desc": "Lucas designs the app’s visual experience, combining clarity, interactivity, and elegance to make financial analysis more accessible.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Lucas-JACCARD.jpg"
+        },
     ]
 
-    card_css = """
-    <style>
-    .team-card {
-        background-color: #111111;
-        border-radius: 16px;
-        padding: 15px;
-        text-align: center;
-        box-shadow: 0 0 10px rgba(255,255,255,0.05);
-        transition: all 0.3s ease;
-    }
-    .team-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0 20px rgba(255,255,255,0.1);
-    }
-    .team-img {
-        border-radius: 50%;
-        width: 120px;
-        height: 120px;
-        object-fit: cover;
-        margin-bottom: 10px;
-    }
-    .team-name {
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 2px;
-    }
-    .team-role {
-        color: #cccccc;
-        font-style: italic;
-        margin-bottom: 8px;
-    }
-    .team-bio {
-        font-size: 13px;
-        color: #aaaaaa;
-        text-align: justify;
-    }
-    </style>
-    """
-    st.markdown(card_css, unsafe_allow_html=True)
-
-    cols = st.columns(len(team))
-    for i, member in enumerate(team):
-        with cols[i]:
-            st.markdown(f"""
-            <div class="team-card">
-                <img src="{member['img']}" class="team-img">
-                <div class="team-name">{member['name']}</div>
-                <div class="team-role">{member['role']}</div>
-                <div class="team-bio">{member['bio']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("""
-    For questions or collaboration opportunities, feel free to reach out at  
-    📧 **support@pensionoptimizer.com**
-    """)
+    for member in team:
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.image(member["photo"], width=150)
+        with col2:
+            st.subheader(member["name"])
+            st.write(f"**{member['role']}**")
+            st.write(member["desc"])
+        st.markdown("---")
