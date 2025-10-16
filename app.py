@@ -628,3 +628,9 @@ with tab3:
     
     Thank you for using our tool! 🎉
     """)
+
+# Team Section
+    st.subheader("Meet the Team")
+
+    team = [
+        {
