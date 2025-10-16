@@ -661,60 +661,14 @@ with tab3:
             "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Lucas-JACCARD.jpg"
         },
     ]
-card_css = """
-    <style>
-    .team-card {
-        background-color: #111111;
-        border-radius: 16px;
-        padding: 15px;
-        text-align: center;
-        box-shadow: 0 0 10px rgba(255,255,255,0.05);
-        transition: all 0.3s ease;
-    }
-    .team-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0 20px rgba(255,255,255,0.1);
-    }
-    .team-img {
-        border-radius: 50%;
-        width: 120px;
-        height: 120px;
-        object-fit: cover;
-        margin-bottom: 10px;
-    }
-    .team-name {
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 2px;
-    }
-    .team-role {
-        color: #cccccc;
-        font-style: italic;
-        margin-bottom: 8px;
-    }
-    .team-bio {
-        font-size: 13px;
-        color: #aaaaaa;
-        text-align: justify;
-    }
-    </style>
-    """
-    st.markdown(card_css, unsafe_allow_html=True)
 
+    
+# Display team members horizontally
     cols = st.columns(len(team))
+
     for i, member in enumerate(team):
         with cols[i]:
-            st.markdown(f"""
-            <div class="team-card">
-                <img src="{member['img']}" class="team-img">
-                <div class="team-name">{member['name']}</div>
-                <div class="team-role">{member['role']}</div>
-                <div class="team-bio">{member['bio']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("""
-    For questions or collaboration opportunities, feel free to reach out at  
-    📧 **support@pensionoptimizer.com**
-    """)
+            st.image(member["photo"], width=150)
+            st.markdown(f"### {member['name']}")
+            st.markdown(f"**{member['role']}**")
+            st.write(member["desc"])
