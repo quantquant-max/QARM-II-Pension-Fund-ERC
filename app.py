@@ -630,40 +630,80 @@ with tab3:
     """)
 
     st.markdown("---")
+    st.subheader("Meet the Team")
 
-    st.subheader("👥 Meet the Team")
+    team = [
+        {"name": "Rihem Rhaiem", "role": "Project Lead & Quant Researcher",
+         "bio": "Specialized in portfolio theory and optimization, Rihem led the ERC model design and supervised the integration of quantitative finance concepts.",
+         "img": "photos/rihem.jpg"},
+        {"name": "Audrey Champion", "role": "Data Science & Visualization",
+         "bio": "Audrey focused on financial data preprocessing and developed interactive dashboards for portfolio insights.",
+         "img": "photos/audrey.jpg"},
+        {"name": "Arda Budak", "role": "Optimization & Model Engineering",
+         "bio": "Arda implemented and optimized the ERC formulation, ensuring stability and computational efficiency.",
+         "img": "photos/arda.jpg"},
+        {"name": "Edward Arion", "role": "UI/UX & System Design",
+         "bio": "Edward designed the user interface and contributed to an intuitive visualization experience.",
+         "img": "photos/edward.jpg"},
+        {"name": "Lucas Jaccard", "role": "Economic & Strategic Analysis",
+         "bio": "Lucas provided market and macro insights linking theory with applied asset management.",
+         "img": "photos/lucas.jpg"}
+    ]
 
-    # Team grid
-    col1, col2, col3 = st.columns(3)
+    card_css = """
+    <style>
+    .team-card {
+        background-color: #111111;
+        border-radius: 16px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 0 10px rgba(255,255,255,0.05);
+        transition: all 0.3s ease;
+    }
+    .team-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0 20px rgba(255,255,255,0.1);
+    }
+    .team-img {
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        margin-bottom: 10px;
+    }
+    .team-name {
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 2px;
+    }
+    .team-role {
+        color: #cccccc;
+        font-style: italic;
+        margin-bottom: 8px;
+    }
+    .team-bio {
+        font-size: 13px;
+        color: #aaaaaa;
+        text-align: justify;
+    }
+    </style>
+    """
+    st.markdown(card_css, unsafe_allow_html=True)
 
-    with col1:
-        st.image("team_photos/Rihem-RHAIEM.jpg", caption="Rihem Rhaiem — Quant Researcher", width=220)
-        st.write("[LinkedIn](https://www.linkedin.com/in/rihem-rhaiem-318577225/)")
+    cols = st.columns(len(team))
+    for i, member in enumerate(team):
+        with cols[i]:
+            st.markdown(f"""
+            <div class="team-card">
+                <img src="{member['img']}" class="team-img">
+                <div class="team-name">{member['name']}</div>
+                <div class="team-role">{member['role']}</div>
+                <div class="team-bio">{member['bio']}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    with col2:
-        st.image("team_photos/Audrey-CHAMPION.jpg", caption="Audrey Champion — Financial Data Scientist", width=220)
-        st.write("[LinkedIn](https://www.linkedin.com/in/audrey-champion-103b16247/)")
-
-    with col3:
-        st.image("team_photos/Lucas-JACCARD.jpg", caption="Lucas Jaccard — Portfolio Strategist", width=220)
-        st.write("[LinkedIn](https://www.linkedin.com/in/lucas-jaccard-420b64190/)")
-    
     st.markdown("---")
-
-    st.write("""
-    🧭 *Our Vision*  
-    To bring transparency, risk control, and advanced optimization techniques into the hands of pension fund managers and individual investors.
-
-    💡 *Technology Stack*  
-    Built with [Streamlit](https://streamlit.io/), [Plotly](https://plotly.com/python/), and [Python](https://www.python.org/),
-    the application uses advanced portfolio optimization (Dynamic Equal Risk Contribution) to ensure risk parity across time.
-
-    📧 *Contact us:*  
-    support@pensionoptimizer.com
+    st.markdown("""
+    For questions or collaboration opportunities, feel free to reach out at  
+    📧 **support@pensionoptimizer.com**
     """)
-
-    st.markdown("---")
-
-    st.success("Thank you for using our Pension Fund Optimizer! 🎉")
-
-
