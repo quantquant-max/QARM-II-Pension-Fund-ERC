@@ -678,6 +678,5 @@ with tab3:
 
 st.markdown("---")
     st.markdown("""
-    For questions or collaboration opportunities, feel free to reach out at  
-    📧 **support@pensionoptimizer.com**
+    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
     """)
