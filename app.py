@@ -629,6 +629,9 @@ with tab3:
     Thank you for using our tool! 🎉 
     """)
 
+     st.markdown("---")
+    st.subheader("Meet the Team")
+
     team = [
         {
             "name": "Rihem Rhaiem",
