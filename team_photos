@@ -6,7 +6,6 @@ We are a dedicated team of financial experts and developers passionate about hel
 
 Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time. 
 
-
 Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
 
 If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com. 
@@ -18,6 +17,12 @@ Thank you for using our tool! 🎉 """)
     with col1:
         st.image("team_photos/audrey.jpg", caption="Audrey Champion - CEO", use_container_width=True)
         st.markdown("[LinkedIn]("https://www.linkedin.com/in/audrey-champion-103b16247/")
+with col2:
+        st.image("team_photos/rihem.jpg", caption="Rihem Rhaiem - CEO", use_container_width=True)
+        st.markdown("[LinkedIn]("https://www.linkedin.com/in/rihem-rhaiem-318577225/")
+with col3:
+        st.image("team_photos/lucas.jpg", caption="Lucas Jaccard - CEO", use_container_width=True)
+        st.markdown("[LinkedIn]("https://www.linkedin.com/in/lucas-jaccard-420b64190/")
 
 # Responsive grid layout
     cols = st.columns(len(team))
