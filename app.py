@@ -650,7 +650,7 @@ with tab3:
             "name": "Arda Budak",
             "role": "Quantitative Analyst",
             "desc": "Arda applies quantitative methods and stochastic simulations to enhance risk control and portfolio diversification within the project.",
-            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Arda-BUDAK.jpg"
+            "photo": "https://github.com/quantquant-max/QARM-II-Pension-Fund-ERC/blob/main/team_photos/Arda-BUDAK.JPG"
         },
         {
             "name": "Rihem Rhaiem",
