@@ -624,6 +624,8 @@ with tab3:
     
     Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results. 
     
+    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
+    
     Thank you for using our tool! 🎉 
     """)
 
@@ -632,6 +634,24 @@ with tab3:
     st.markdown("<br>", unsafe_allow_html=True)
 
     team = [
+ {
+            "name": "Lucas Jaccard",
+            "role": "Frontend Developer",
+            "desc": "Lucas designs the app’s visual experience, combining clarity, interactivity, and elegance to make financial analysis more accessible.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Lucas-JACCARD.jpg"
+        },
+ {
+            "name": "Edward Arion",
+            "role": "Backend Developer",
+            "desc": "Edward ensures computational stability and performance, integrating optimization algorithms efficiently within the Streamlit app.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Edward-ARION.jpg"
+        },
+ {
+            "name": "Arda Budak",
+            "role": "Quantitative Analyst",
+            "desc": "Arda applies quantitative methods and stochastic simulations to enhance risk control and portfolio diversification within the project.",
+            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Arda-BUDAK.jpg"
+        },
         {
             "name": "Rihem Rhaiem",
             "role": "Data Scientist",
@@ -643,25 +663,7 @@ with tab3:
             "role": "Financial Engineer",
             "desc": "Audrey focuses on translating theory into practice, helping design the pension fund strategy and ensuring academic rigor in implementation.",
             "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Audrey-CHAMPION.jpg"
-        },
-        {
-            "name": "Arda Budak",
-            "role": "Quantitative Analyst",
-            "desc": "Arda applies quantitative methods and stochastic simulations to enhance risk control and portfolio diversification within the project.",
-            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Arda-BUDAK.jpg"
-        },
-        {
-            "name": "Edward Arion",
-            "role": "Backend Developer",
-            "desc": "Edward ensures computational stability and performance, integrating optimization algorithms efficiently within the Streamlit app.",
-            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Edward-ARION.jpg"
-        },
-        {
-            "name": "Lucas Jaccard",
-            "role": "Frontend Developer",
-            "desc": "Lucas designs the app’s visual experience, combining clarity, interactivity, and elegance to make financial analysis more accessible.",
-            "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Lucas-JACCARD.jpg"
-        },
+        }
     ]
 
     
@@ -675,8 +677,3 @@ with tab3:
             st.markdown(f"**{member['role']}**")
             st.write(member["desc"])
 
-
-st.markdown("---")
-    st.markdown("""
-    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
-    """)
