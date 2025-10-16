@@ -623,7 +623,8 @@ with tab3:
     Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time.
     
     Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
-    
 
+    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
+    
     Thank you for using our tool! 🎉
     """)
