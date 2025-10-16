@@ -629,8 +629,9 @@ with tab3:
     Thank you for using our tool! 🎉 
     """)
 
-     st.markdown("---")
-    st.subheader("Meet the Team")
+    st.markdown("---")
+    st.markdown("## 👥 Meet the Team")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     team = [
         {
