@@ -627,30 +627,3 @@ If you have any questions or feedback, feel free to reach out at support@pension
 
 Thank you for using our tool! 🎉 """)
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.image("team_photos/audrey.jpg", caption="Audrey Champion - CEO", use_container_width=True)
-        st.markdown("[LinkedIn]("https://www.linkedin.com/in/audrey-champion-103b16247/")
-with col2:
-        st.image("team_photos/rihem.jpg", caption="Rihem Rhaiem - CEO", use_container_width=True)
-        st.markdown("[LinkedIn]("https://www.linkedin.com/in/rihem-rhaiem-318577225/")
-with col3:
-        st.image("team_photos/lucas.jpg", caption="Lucas Jaccard - CEO", use_container_width=True)
-        st.markdown("[LinkedIn]("https://www.linkedin.com/in/lucas-jaccard-420b64190/")
-
-# Responsive grid layout
-    cols = st.columns(len(team))
-    for i, member in enumerate(team):
-        with cols[i]:
-            st.image(member["img"], width=150)
-            st.markdown(f"**{member['name']}**")
-            st.markdown(f"_{member['role']}_")
-            st.markdown(f"<p style='font-size:14px; color:#cccccc; text-align:justify'>{member['bio']}</p>", unsafe_allow_html=True)
-
-    st.markdown("""
-    ---
-    For questions or collaboration opportunities, feel free to reach out at  
-    📧 **support@pensionoptimizer.com**
-    """)
-    
