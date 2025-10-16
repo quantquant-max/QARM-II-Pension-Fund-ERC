@@ -615,57 +615,31 @@ with tab2:
 
 with tab3:
     st.title("About Us")
-    st.write("""
-    Welcome to the Pension Fund Optimizer!
-    
-    We are a dedicated team of financial experts and developers passionate about helping individuals and institutions optimize their pension funds for maximum efficiency and risk management.
-    
-    Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time.
-    
-    Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
+    st.write("with tab3: st.title("About Us") st.write(""" Welcome to the Pension Fund Optimizer! 
 
-    If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com.
-    
-    Thank you for using our tool! 🎉
-    """)
+We are a dedicated team of financial experts and developers passionate about helping individuals and institutions optimize their pension funds for maximum efficiency and risk management. 
 
-# Team Section
-    st.subheader("Meet the Team")
+Our tool uses advanced optimization techniques, specifically Dynamic Equal Risk Contribution (ERC) with annual rebalancing, to create balanced portfolios that aim to equalize the risk contributions from each asset over time. 
 
-    team = [
-        {
-            "name": "Rihem Rhaiem",
-            "role": "Project Lead & Quant Researcher",
-            "bio": "Specialized in portfolio theory and optimization, Rihem led the development of the ERC model and supervised the integration of quantitative finance concepts.",
-            "img": "photos/rihem.jpg"
-        },
-        {
-            "name": "Audrey Champion",
-            "role": "Data Science & Visualization",
-            "bio": "Audrey focused on financial data preprocessing, building clear and interactive dashboards using Streamlit and Plotly for portfolio insights.",
-            "img": "photos/audrey.jpg"
-        },
-        {
-            "name": "Arda Budak",
-            "role": "Optimization & Model Engineering",
-            "bio": "Arda implemented and optimized the mathematical formulation of the ERC portfolio, ensuring stability and computational efficiency.",
-            "img": "photos/arda.jpg"
-        },
-        {
-            "name": "Edward Arion",
-            "role": "UI/UX & System Design",
-            "bio": "Edward designed the overall user experience, ensuring intuitive interaction between optimization results and visualization outputs.",
-            "img": "photos/edward.jpg"
-        },
-        {
-            "name": "Lucas Jaccard",
-            "role": "Economic & Strategic Analysis",
-            "bio": "Lucas provided strategic insights on market dynamics and contributed to connecting theoretical finance with practical applications.",
-            "img": "photos/lucas.jpg"
-        }
-    ]
+Built with Streamlit and powered by open-source libraries, this app provides an intuitive interface for selecting assets, analyzing historical data, and visualizing results.
 
-    # Responsive grid layout
+If you have any questions or feedback, feel free to reach out at support@pensionoptimizer.com. 
+
+Thank you for using our tool! 🎉 """)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.image("team_photos/audrey.jpg", caption="Audrey Champion - CEO", use_container_width=True)
+        st.markdown("[LinkedIn]("https://www.linkedin.com/in/audrey-champion-103b16247/")
+with col2:
+        st.image("team_photos/rihem.jpg", caption="Rihem Rhaiem - CEO", use_container_width=True)
+        st.markdown("[LinkedIn]("https://www.linkedin.com/in/rihem-rhaiem-318577225/")
+with col3:
+        st.image("team_photos/lucas.jpg", caption="Lucas Jaccard - CEO", use_container_width=True)
+        st.markdown("[LinkedIn]("https://www.linkedin.com/in/lucas-jaccard-420b64190/")
+
+# Responsive grid layout
     cols = st.columns(len(team))
     for i, member in enumerate(team):
         with cols[i]:
@@ -679,3 +653,4 @@ with tab3:
     For questions or collaboration opportunities, feel free to reach out at  
     📧 **support@pensionoptimizer.com**
     """)
+    
