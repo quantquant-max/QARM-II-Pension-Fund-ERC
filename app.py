@@ -634,3 +634,48 @@ with tab3:
 
     team = [
         {
+            "name": "Rihem Rhaiem",
+            "role": "Project Lead & Quant Researcher",
+            "bio": "Specialized in portfolio theory and optimization, Rihem led the development of the ERC model and supervised the integration of quantitative finance concepts.",
+            "img": "photos/rihem.jpg"
+        },
+        {
+            "name": "Audrey Champion",
+            "role": "Data Science & Visualization",
+            "bio": "Audrey focused on financial data preprocessing, building clear and interactive dashboards using Streamlit and Plotly for portfolio insights.",
+            "img": "photos/audrey.jpg"
+        },
+        {
+            "name": "Arda Budak",
+            "role": "Optimization & Model Engineering",
+            "bio": "Arda implemented and optimized the mathematical formulation of the ERC portfolio, ensuring stability and computational efficiency.",
+            "img": "photos/arda.jpg"
+        },
+        {
+            "name": "Edward Arion",
+            "role": "UI/UX & System Design",
+            "bio": "Edward designed the overall user experience, ensuring intuitive interaction between optimization results and visualization outputs.",
+            "img": "photos/edward.jpg"
+        },
+        {
+            "name": "Lucas Jaccard",
+            "role": "Economic & Strategic Analysis",
+            "bio": "Lucas provided strategic insights on market dynamics and contributed to connecting theoretical finance with practical applications.",
+            "img": "photos/lucas.jpg"
+        }
+    ]
+
+    # Responsive grid layout
+    cols = st.columns(len(team))
+    for i, member in enumerate(team):
+        with cols[i]:
+            st.image(member["img"], width=150)
+            st.markdown(f"**{member['name']}**")
+            st.markdown(f"_{member['role']}_")
+            st.markdown(f"<p style='font-size:14px; color:#cccccc; text-align:justify'>{member['bio']}</p>", unsafe_allow_html=True)
+
+    st.markdown("""
+    ---
+    For questions or collaboration opportunities, feel free to reach out at  
+    📧 **support@pensionoptimizer.com**
+    """)
