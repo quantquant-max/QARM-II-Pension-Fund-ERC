@@ -635,19 +635,19 @@ with tab3:
     team = [
         {"name": "Rihem Rhaiem", "role": "Project Lead & Quant Researcher",
          "bio": "Specialized in portfolio theory and optimization, Rihem led the ERC model design and supervised the integration of quantitative finance concepts.",
-         "img": "team_photos/rihem.jpg"},
+         "img": "team_photos/Rihem-RHAIEM.jpg"},
         {"name": "Audrey Champion", "role": "Data Science & Visualization",
          "bio": "Audrey focused on financial data preprocessing and developed interactive dashboards for portfolio insights.",
-         "img": "team_photos/audrey.jpg"},
+         "img": "team_photos/Audrey-CHAMPION.jpg"},
         {"name": "Arda Budak", "role": "Optimization & Model Engineering",
          "bio": "Arda implemented and optimized the ERC formulation, ensuring stability and computational efficiency.",
-         "img": "team_photos/arda.jpg"},
+         "img": "team_photos/Arda-BUDAK.jpg"},
         {"name": "Edward Arion", "role": "UI/UX & System Design",
          "bio": "Edward designed the user interface and contributed to an intuitive visualization experience.",
-         "img": "team_photos/edward.jpg"},
+         "img": "team_photos/Edward-ARION.jpg"},
         {"name": "Lucas Jaccard", "role": "Economic & Strategic Analysis",
          "bio": "Lucas provided market and macro insights linking theory with applied asset management.",
-         "img": "team_photos/lucas.jpg"}
+         "img": "team_photos/Lucas-JACCARD.jpg"}
     ]
 
     card_css = """
