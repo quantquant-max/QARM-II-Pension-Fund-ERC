@@ -133,287 +133,334 @@ st.markdown(
 )
 
 # Data loading functions
+@st.cache_data
 def load_custom_data():
-    try:
-        df = pd.read_csv("Stock_Returns_With_Names_post2000_cleaned.csv")
-        df.set_index('Company_Ticker', inplace=True)
-        df = df.apply(pd.to_numeric, errors='coerce')  # Ensure numeric, coerce errors to NaN
-        df.columns = pd.to_datetime(df.columns.str.replace('_', ':'))
-        df = df.transpose()
-        return df
-    except Exception as e:
-        st.error(f"Failed to load the custom dataset: {str(e)}. Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
-        return pd.DataFrame()
+    comp = pd.read_parquet("compustat_git.parquet")
+    etf = pd.read_parquet("etf_git.parquet")
+
+    
+    comp = comp[["date", "company_name", "monthly_return"]].copy()
+    comp["date"] = pd.to_datetime(comp["date"])
+
+    comp = comp.rename(columns={
+        "company_name": "asset",  
+        "monthly_return": "ret"
+    })
+
+    etf = etf.rename(columns={
+        "ETF": "asset",
+        "return_monthly": "ret"     
+    })
+
+    etf = etf[["date", "asset", "ret"]].copy()
+    etf["date"] = pd.to_datetime(etf["date"])
+
+    returns_long = pd.concat([comp, etf], ignore_index=True)
+
+    returns_wide = (
+        returns_long
+        .pivot(index="date", columns="asset", values="ret")
+        .sort_index()
+    )
+    returns_wide.index = pd.to_datetime(returns_wide.index)
+
+    return returns_wide
+
 
 def get_data(tickers, start, end, custom_data):
-    try:
-        data = custom_data.loc[start:end, tickers]
-        # No dropna to allow NaN for rolling universe
-        return data
-    except Exception as e:
+    start = pd.to_datetime(start)
+    end = pd.to_datetime(end)
+
+    if custom_data.empty:
         return pd.DataFrame()
 
-# Cache valid stocks computation
-@st.cache_data
-def get_valid_stocks(_custom_data, start_date, end_date, _cache_key=str(datetime.now())):
-    try:
-        # Ensure the DataFrame is not empty
-        if _custom_data.empty:
-            st.error("Custom data is empty.")
-            return []
-        
-        # Exclude benchmark columns
-        exclude_columns = ["Value Weighted Benchmark", "Equally Weighted Benchmark"]
-        valid_stocks = [col for col in _custom_data.columns if col not in exclude_columns]
-        
-        return valid_stocks
-    except Exception as e:
-        st.error(f"Error retrieving stock list: {str(e)}")
-        return []
+    missing = [t for t in tickers if t not in custom_data.columns]
 
-# Optimization function with rolling universe
-def perform_optimization(selected_assets, start_date, end_date, rebalance_freq, custom_data):
+    if len(missing) > 0:
+        st.warning(f"⚠️ The following assets do not exist in the database: {missing}")
+        tickers = [t for t in tickers if t in custom_data.columns]
+
+    if len(tickers) == 0:
+        return pd.DataFrame()
+
+    data = custom_data.loc[start:end, tickers]
+
+    data = data.sort_index()
+
+    return data
+
+
+@st.cache_data
+def get_valid_assets(custom_data, start_date, end_date):
+
+    start_date = pd.to_datetime(start_date)
+    end_date   = pd.to_datetime(end_date)
+
+    comp = pd.read_parquet("compustat_git.parquet")
+    etf  = pd.read_parquet("etf_git.parquet")
+
+    comp_assets = sorted(comp["company_name"].unique())
+    etf_assets  = sorted(etf["ETF"].unique())
+
+    subset = custom_data.loc[start_date:end_date]
+
+    available_assets = subset.columns[subset.notna().any()].tolist()
+
+    # 3. Intersection pour filtrer
+    valid_stocks = sorted(list(set(comp_assets) & set(available_assets)))
+    valid_etfs   = sorted(list(set(etf_assets)  & set(available_assets)))
+
+    return {
+        "stocks": valid_stocks,
+        "etfs": valid_etfs
+    }
+import numpy as np
+import pandas as pd
+import cvxpy as cp
+from scipy.optimize import minimize_scalar
+from sklearn.covariance import LedoitWolf
+import streamlit as st
+
+
+def get_common_start_date(custom_data: pd.DataFrame,
+                          selected_assets: list[str],
+                          user_start_date) -> pd.Timestamp:
+    user_start_date = pd.to_datetime(user_start_date)
+
+    missing = [a for a in selected_assets if a not in custom_data.columns]
+    if missing:
+        st.error(f"The selected assets are not available in the database : {missing}")
+        return None
+
+
+    first_valid = custom_data[selected_assets].apply(lambda col: col.first_valid_index())
+
+
+    common_start = first_valid.max()
+
+    if pd.isna(common_start):
+        st.error("No common valid date found for the selected assets.")
+        return None
+
+
+    if common_start > user_start_date:
+        st.warning(
+            f"⚠️ The chosen start date ({user_start_date.date()}) "
+            f"is not available for the selected assets.\n\n"
+            f"➡️ The optimisation will start on{common_start.date()}**, "
+            f"which is the first date where all return series are available."
+        )
+
+    return max(common_start, user_start_date)
+
+
+def compute_rebalance_indices(dates: pd.DatetimeIndex, freq_label: str) -> list[int]:
+
+    if freq_label == "Quarterly":
+        step = 3
+    elif freq_label == "Semi-Annually":
+        step = 6
+    elif freq_label == "Annually":
+        step = 12
+    else:
+        raise ValueError(f"Unknown frequency : {freq_label}")
+
+    n = len(dates)
+    idxs = list(range(0, n, step))
+    if idxs[-1] != n - 1:
+        idxs.append(n - 1)  # on force un dernier rebalance à la fin
+
+    return idxs
+
+
+def solve_erc_weights(cov_matrix: np.ndarray) -> np.ndarray:
+    n = cov_matrix.shape[0]
+
+    def solve_with_rho(rho: float):
+        w = cp.Variable(n)
+        objective = cp.Minimize(cp.quad_form(w, cov_matrix) - rho * cp.sum(cp.log(w)))
+        constraints = [cp.sum(w) == 1, w >= 1e-6]
+        prob = cp.Problem(objective, constraints)
+        prob.solve(solver=cp.ECOS)
+        if prob.status == "optimal":
+            return np.array(w.value).flatten()
+        return None
+
+    def rc_variance(rho: float) -> float:
+        w = solve_with_rho(rho)
+        if w is None:
+            return np.inf
+        var = w @ cov_matrix @ w
+        sigma = np.sqrt(var)
+        if sigma <= 0:
+            return np.inf
+        mrc = cov_matrix @ w
+        rc = w * mrc / sigma
+        return np.var(rc)
+
+    res = minimize_scalar(
+        rc_variance,
+        bounds=(1e-6, 1e-1),
+        method="bounded",
+        tol=1e-5
+    )
+    best_rho = res.x
+    w_star = solve_with_rho(best_rho)
+    if w_star is None:
+        raise RuntimeError("ERC Optimisation Failed (No optimal solution has been found).")
+
+    w_star = np.where(np.abs(w_star) < 1e-6, 0, w_star)
+    w_star = np.clip(w_star, 0, None)
+    if w_star.sum() <= 0:
+        raise RuntimeError("Non-valid ERC Solution (sum of weights <= 0).")
+    w_star /= w_star.sum()
+    return w_star
+
+
+def perform_optimization(
+    selected_assets: list[str],
+    user_start_date,
+    end_date,
+    rebalance_freq: str,
+    custom_data: pd.DataFrame,
+    lookback_months: int = 36,
+    ann_factor: int = 12,
+    tc_rate: float = 0.001,
+):
+
     try:
-        lookback_start = start_date - timedelta(days=365)
-        data = get_data(selected_assets, lookback_start, end_date, custom_data)
-        bench_data = get_data(["Value Weighted Benchmark", "Equally Weighted Benchmark"], lookback_start, end_date, custom_data)
-        
-        if data.empty or bench_data.empty:
-            st.error("No data available for the selected assets and date range.")
+
+        user_start_date = pd.to_datetime(user_start_date)
+        end_date = pd.to_datetime(end_date)
+
+        if custom_data.empty:
+            st.error("Les données de marché sont vides.")
             return None
-        
-        returns = data
-        value_weighted_returns = bench_data["Value Weighted Benchmark"].fillna(0)
-        equally_weighted_returns = bench_data["Equally Weighted Benchmark"].fillna(0)
-        
-        period_returns = returns.loc[start_date:end_date]
-        period_value_weighted = value_weighted_returns.loc[start_date:end_date]
-        period_equally_weighted = equally_weighted_returns.loc[start_date:end_date]
-        
-        if len(period_returns) < 2:
-            st.error("Insufficient data points for the selected period.")
+
+        common_start = get_common_start_date(custom_data, selected_assets, user_start_date)
+        if common_start is None:
             return None
-        
-        tc_rate = 0.001
-        freq_map = {
-            'Quarterly': 'QS',
-            'Semi-Annually': '6MS',
-            'Annually': 'YS'
-        }
-        freq = freq_map[rebalance_freq]
-        
-        date_range = pd.date_range(start=start_date, end=end_date, freq=freq)
-        rebalance_dates = []
-        for d in date_range:
-            candidates = returns.index[returns.index >= d]
-            if not candidates.empty:
-                rebalance_dates.append(candidates[0])
-        
-        if returns.index[-1] not in rebalance_dates and returns.index[-1] > rebalance_dates[-1]:
-            rebalance_dates.append(returns.index[-1])
-        
+
+        returns_all = custom_data[selected_assets].sort_index()
+
+        returns_all = returns_all.loc[common_start:end_date]
+
+        if returns_all.shape[0] < lookback_months + 2:
+            st.error(
+                f"Not enough data history to estimate the covariance on {lookback_months} months "
+                f"with a study period until {end_date.date()}."
+            )
+            return None
+
+        period_returns = returns_all.copy()
+        period_dates = period_returns.index
+
+        rebalance_indices = compute_rebalance_indices(period_dates, rebalance_freq)
+
         n = len(selected_assets)
-        previous_weights = np.zeros(n)  # Start with zero weights
-        port_returns = pd.Series(index=period_returns.index, dtype=float)
+        previous_weights = np.zeros(n)
+        port_returns = pd.Series(index=period_dates, dtype=float)
         weights_over_time = {}
         total_tc = 0.0
-        
-        # Initial optimization
-        rebal_date = rebalance_dates[0]
-        est_end = rebal_date - pd.Timedelta(days=1)
-        est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
-        est_returns = returns.loc[est_start:est_end]
-        
-        active_assets = [asset for asset in selected_assets if not est_returns[asset].isna().all()]
-        n_active = len(active_assets)
-        
-        if n_active == 0:
-            st.error("No active assets for the initial period.")
-            return None
-        
-        est_returns_active = est_returns[active_assets].dropna(how='any')
-        
-        if len(est_returns_active) < n_active + 1:
-            st.error("Insufficient clean data for active assets in the initial period.")
-            return None
-        
-        mu = est_returns_active.mean() * 252
-        lw = LedoitWolf().fit(est_returns_active)
-        S_np = lw.covariance_ * 252
-        mu_np = mu.to_numpy()
-        
-        def solve_with_rho(rho):
-            w = cp.Variable(n_active)
-            objective = cp.Minimize(cp.quad_form(w, S_np) - rho * cp.sum(cp.log(w)))
-            constraints = [cp.sum(w) == 1, w >= 1e-6]
-            prob = cp.Problem(objective, constraints)
-            prob.solve(solver=cp.ECOS)
-            if prob.status == "optimal":
-                return w.value
-            return None
-        
-        def get_rc_var(rho):
-            w = solve_with_rho(rho)
-            if w is None:
-                return np.inf
-            var = w @ S_np @ w
-            sigma = np.sqrt(var)
-            MRC = S_np @ w
-            RC = w * MRC / sigma
-            return np.var(RC)
-        
-        res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
-        best_rho = res.x
-        weights_active = solve_with_rho(best_rho)
-        
-        if weights_active is None:
-            st.error("Initial optimization failed. Please try a different date range or fewer assets.")
-            return None
-        else:
-            weights_active = np.where(np.abs(weights_active) < 1e-4, 0, weights_active)
-            weights_active /= np.sum(weights_active)
-            
-            weights = np.zeros(n)
-            for i, asset in enumerate(active_assets):
-                idx = selected_assets.index(asset)
-                weights[idx] = weights_active[i]
-            
+
+        full_dates = returns_all.index
+
+        for j, reb_idx in enumerate(rebalance_indices):
+            rebal_date = period_dates[reb_idx]
+
+            global_reb_pos = full_dates.get_loc(rebal_date)
+            start_pos = max(0, global_reb_pos - lookback_months)
+            est_window = returns_all.iloc[start_pos:global_reb_pos]
+
+            est_window = est_window.dropna(how="all")
+            est_window = est_window.dropna(how="any")
+
+            if est_window.shape[0] < n + 1:
+                st.error(
+                    f"Not enough proper data to estimate covariance "
+                    f"before rebalancing date {rebal_date.date()}."
+                )
+                return None
+
+            # Estimation de la covariance (Ledoit-Wolf)
+            lw = LedoitWolf().fit(est_window.values)
+            cov = lw.covariance_ * ann_factor
+
+            try:
+                weights = solve_erc_weights(cov)
+            except Exception as e:
+                st.error(f"ERC Optimisation failed on {rebal_date.date()} : {e}")
+                return None
+
             turnover = np.sum(np.abs(weights - previous_weights)) / 2
             cost = turnover * tc_rate
             total_tc += cost
-            
-            previous_weights = weights
+
+            previous_weights = weights.copy()
             weights_over_time[rebal_date] = weights
-        
-        # Subsequent rebalances
-        for i in range(1, len(rebalance_dates)):
-            rebal_date = rebalance_dates[i]
-            prev_rebal_date = rebalance_dates[i-1]
-            
-            # Period returns, fill NaN with 0 for inactive assets
-            period_returns_slice = period_returns.loc[prev_rebal_date:rebal_date - pd.Timedelta(days=1)].fillna(0)
-            if not period_returns_slice.empty:
-                period_port_ret = period_returns_slice.dot(previous_weights)
-                port_returns.loc[period_returns_slice.index] = period_port_ret
-            
-            # Rebalance
-            est_end = rebal_date - pd.Timedelta(days=1)
-            est_start = max(returns.index[0], est_end - pd.Timedelta(days=365))
-            est_returns = returns.loc[est_start:est_end]
-            
-            active_assets = [asset for asset in selected_assets if not est_returns[asset].isna().all()]
-            n_active = len(active_assets)
-            
-            if n_active == 0:
-                st.warning(f"No active assets for rebalance at {rebal_date}. Keeping previous weights.")
-                weights = previous_weights
-                cost = 0
+
+            if j == len(rebalance_indices) - 1:
+                # Dernier rebalance : jusqu'à la fin
+                start_slice = reb_idx
+                end_slice = len(period_dates)
             else:
-                est_returns_active = est_returns[active_assets].dropna(how='any')
-                
-                if len(est_returns_active) < n_active + 1:
-                    st.warning(f"Insufficient data for rebalance at {rebal_date}. Keeping previous weights.")
-                    weights = previous_weights
-                    cost = 0
-                else:
-                    mu = est_returns_active.mean() * 252
-                    lw = LedoitWolf().fit(est_returns_active)
-                    S_np = lw.covariance_ * 252
-                    mu_np = mu.to_numpy()
-                    
-                    res = minimize_scalar(get_rc_var, bounds=(1e-6, 1e-1), method='bounded', tol=1e-5)
-                    best_rho = res.x
-                    weights_active = solve_with_rho(best_rho)
-                    
-                    if weights_active is None:
-                        st.warning(f"Optimization failed for rebalance at {rebal_date}. Keeping previous weights.")
-                        weights = previous_weights
-                        cost = 0
-                    else:
-                        weights_active = np.where(np.abs(weights_active) < 1e-4, 0, weights_active)
-                        weights_active /= np.sum(weights_active)
-                        
-                        weights = np.zeros(n)
-                        for i, asset in enumerate(active_assets):
-                            idx = selected_assets.index(asset)
-                            weights[idx] = weights_active[i]
-                        
-                        turnover = np.sum(np.abs(weights - previous_weights)) / 2
-                        cost = turnover * tc_rate
-                        total_tc += cost
-            
-            weights_over_time[rebal_date] = weights
-            previous_weights = weights
-        
-        # Last period
-        last_rebal_date = rebalance_dates[-1]
-        last_period_returns = period_returns.loc[last_rebal_date:].fillna(0)
-        if not last_period_returns.empty:
-            last_port_ret = last_period_returns.dot(previous_weights)
-            port_returns.loc[last_period_returns.index] = last_port_ret
-        
-        # Drop NaN in port_returns (shouldn't have any due to fillna)
+                start_slice = reb_idx
+                end_slice = rebalance_indices[j + 1]
+
+            sub_ret = period_returns.iloc[start_slice:end_slice].fillna(0.0)
+            if not sub_ret.empty:
+                port_ret = sub_ret.values @ weights
+                port_returns.iloc[start_slice:end_slice] = port_ret
+
         port_returns = port_returns.dropna()
-        
-        # Cumulative
+        if port_returns.empty:
+            st.error("The portfolio's return series is empty after backtesting.")
+            return None
+
         cum_port = (1 + port_returns).cumprod()
-        cum_value_weighted = (1 + period_value_weighted).cumprod()
-        cum_equally_weighted = (1 + period_equally_weighted).cumprod()
-        
-        # Metrics
-        ann_return = port_returns.mean() * 252
-        ann_vol = port_returns.std() * np.sqrt(252)
-        sharpe = ann_return / ann_vol if ann_vol > 0 else 0
-        
-        # Risk contrib using last year, fill NaN with 0
-        est_returns = returns.iloc[-252:].fillna(0)
-        lw = LedoitWolf().fit(est_returns)
-        S_np = lw.covariance_ * 252
-        port_var = weights @ S_np @ weights
-        sigma = np.sqrt(port_var)
-        MRC = S_np @ weights
-        risk_contrib = weights * MRC / sigma
-        total_risk = np.sum(risk_contrib)
-        risk_contrib_pct = (risk_contrib / total_risk) * 100 if total_risk > 0 else np.zeros(n)
-        
-        # Weights animation
-        weights_df = pd.DataFrame(weights_over_time, index=selected_assets).T * 100
-        frames = []
-        dates = sorted(weights_df.index)
-        for i in range(len(dates)):
-            frame_data = []
-            for asset in selected_assets:
-                frame_data.append(go.Bar(x=selected_assets, y=weights_df.iloc[i], name=asset))
-            frames.append(go.Frame(data=frame_data, name=str(dates[i])))
-        
-        fig_weights = go.Figure(data=[go.Bar(x=selected_assets, y=weights_df.iloc[0], name=asset) for asset in selected_assets],
-                                layout=go.Layout(updatemenus=[dict(type="buttons", buttons=[dict(label="Play", method="animate", args=[None])])],
-                                                 transition_duration=500))
-        fig_weights.frames = frames
-        fig_weights.update_layout(title=dict(text="Weights Evolution Over Time (%)", font=dict(color="#f0f0f0", family="Times New Roman")), paper_bgcolor="#000000", font_color="#f0f0f0", font_family="Times New Roman")
-        fig_weights.update_xaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
-        fig_weights.update_yaxes(title_font_color="#f0f0f0", tickfont_color="#f0f0f0", title_font_family="Times New Roman", tickfont_family="Times New Roman")
-        fig_weights.update_layout(legend=dict(font=dict(color="#f0f0f0", family="Times New Roman")))
-        
+
+        ann_return = port_returns.mean() * ann_factor
+        ann_vol = port_returns.std() * np.sqrt(ann_factor)
+        sharpe = ann_return / ann_vol if ann_vol > 0 else 0.0
+
+        port_var = weights @ cov @ weights
+        sigma_p = np.sqrt(port_var)
+        mrc = cov @ weights
+        rc = weights * mrc / sigma_p  # contributions absolues
+        total_risk = rc.sum()
+        if total_risk <= 0:
+            risk_contrib_pct = np.zeros_like(rc)
+        else:
+            risk_contrib_pct = rc / total_risk * 100.0
+
+        weights_df = (
+            pd.DataFrame(weights_over_time, index=selected_assets)
+            .T
+            .sort_index()
+        ) 
+
+        corr_matrix = est_window.corr()
+
         results = {
             "selected_assets": selected_assets,
             "weights": weights,
+            "risk_contrib_abs": rc,
             "risk_contrib_pct": risk_contrib_pct,
-            "expected_return": ann_return * 100,
-            "volatility": ann_vol * 100,
+            "expected_return": ann_return * 100,   # en %
+            "volatility": ann_vol * 100,          # en %
             "sharpe": sharpe,
-            "cum_port": cum_port,
-            "cum_value_weighted": cum_value_weighted,
-            "cum_equally_weighted": cum_equally_weighted,
-            "total_tc": total_tc * 100,
-            "fig_weights": fig_weights,
             "port_returns": port_returns,
-            "weights_df": weights_df
+            "cum_port": cum_port,
+            "total_tc": total_tc * 100,           # en %
+            "weights_df": weights_df,
+            "corr_matrix": corr_matrix,
         }
         return results
+
     except Exception as e:
-        st.error(f"Optimization error: {str(e)}")
+        st.error(f"Erreur dans l'optimisation : {e}")
         return None
+
 
 # Visualization functions
 def create_pie_chart(assets, values):
@@ -475,128 +522,132 @@ with tab0:
 
 with tab1:
     st.title("Asset Selection")
+
+    # -------------------------------
+    # 1) Chargement des données
+    # -------------------------------
     custom_data = load_custom_data()
     if custom_data.empty:
-        st.error("Failed to load the custom dataset: Ensure 'Stock_Returns_With_Names_post2000_cleaned.csv' is in the root directory.")
-    else:
-        min_date = datetime(2000, 2, 1).date()
-        max_date = datetime(2024, 12, 31).date()
+        st.error("Failed to load dataset.")
+        st.stop()
 
-        # Initialize session state
-        if 'dates_confirmed' not in st.session_state:
-            st.session_state.dates_confirmed = False
-        if 'start_date' not in st.session_state:
-            st.session_state.start_date = None
-        if 'end_date' not in st.session_state:
-            st.session_state.end_date = None
-        if 'valid_stocks' not in st.session_state:
-            st.session_state.valid_stocks = []
+    # Déterminer les dates min/max disponibles dans les données
+    min_date = custom_data.index.min().date()
+    max_date = custom_data.index.max().date()
 
-        st.markdown("### Select Date Range")
+    # -------------------------------
+    # 2) Sélection période utilisateur
+    # -------------------------------
+    st.markdown("### Select Date Range")
 
-        col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date_user = st.date_input("📅 Start Date", value=min_date, min_value=min_date, max_value=max_date)
+    with col2:
+        end_date_user = st.date_input("📅 End Date", value=max_date, min_value=min_date, max_value=max_date)
 
-        with col1:
-            start_date = st.date_input(
-                "📅 Start Date",
-                value=datetime(2018, 1, 1),
-                min_value=min_date,
-                max_value=max_date
+    if start_date_user > end_date_user:
+        st.error("Start date must be before end date.")
+        st.stop()
+
+    # -------------------------------
+    # 3) Obtenir via cache les listes d'actifs (stocks, etfs, all)
+    # -------------------------------
+    stocks, etfs, all_assets = get_valid_assets(custom_data)
+
+    # -------------------------------
+    # 4) Sélection des actifs
+    # -------------------------------
+    st.markdown("### Choose Your Assets")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_stocks = st.multiselect("Stocks", options=stocks)
+    with col2:
+        selected_etfs = st.multiselect("ETFs", options=etfs)
+
+    selected_assets = selected_stocks + selected_etfs
+
+    if not selected_assets:
+        st.info("Select at least one stock or ETF to proceed.")
+        st.stop()
+
+    # -------------------------------
+    # 5) Vérifier si toutes les séries commencent après la date utilisateur
+    # -------------------------------
+    asset_first_dates = {
+        a: custom_data[a].first_valid_index().date() for a in selected_assets
+    }
+    common_start = max(asset_first_dates.values())
+
+    if common_start > start_date_user:
+        st.warning(
+            f"Some assets do not have data at your chosen start date. "
+            f"Optimization will start at **{common_start}** instead of **{start_date_user}**."
+        )
+
+    # -------------------------------
+    # 6) Fréquence de rebalancement
+    # -------------------------------
+    rebalance_freq = st.selectbox(
+        "Rebalance Frequency",
+        options=["Quarterly", "Semi-Annually", "Annually"],
+        index=2
+    )
+
+    # -------------------------------
+    # 7) Bouton d'optimisation
+    # -------------------------------
+    if st.button("Optimize My Portfolio"):
+        with st.spinner("Running optimization..."):
+            results = perform_optimization(
+                selected_assets=selected_assets,
+                start_date_user=start_date_user,
+                end_date_user=end_date_user,
+                rebalance_freq=rebalance_freq,
+                custom_data=custom_data,
             )
+            if results is not None:
+                st.session_state.results = results
+                st.success("Optimization complete! See Portfolio Results tab.")
 
-        with col2:
-            end_date = st.date_input(
-                "📅 End Date",
-                value=datetime(2021, 12, 31),
-                min_value=min_date,
-                max_value=max_date
-            )
-
-        # Validation
-        if start_date > end_date:
-            st.error("Start date must be before end date.")
-        elif end_date > max_date or start_date < min_date:
-            st.error("Dates must be within data range: 2000-02-01 to 2024-12-31.")
-        else:
-            if st.button("Confirm Dates"):
-                st.session_state.start_date = start_date
-                st.session_state.end_date = end_date
-                st.session_state.valid_stocks = get_valid_stocks(custom_data, start_date, end_date)
-                st.session_state.dates_confirmed = True
-                st.success(
-                    f"Dates confirmed! Found {len(st.session_state.valid_stocks)} valid stocks. "
-                    "Please select assets and rebalance frequency below."
-                )
-
-        
-        # Show stock selection and rebalance frequency only after dates are confirmed
-        if st.session_state.dates_confirmed:
-            if not st.session_state.valid_stocks:
-                st.warning("No valid stocks found for the selected date range. Try a different range or check the dataset.")
-            else:
-                st.markdown("### Select Assets and Rebalance Frequency")
-                selected_assets = st.multiselect(
-                    "Select US Stocks",
-                    options=st.session_state.valid_stocks,
-                    key="us_stocks"
-                )
-                
-                rebalance_freq = st.selectbox(
-                    "Rebalance Frequency",
-                    options=['Quarterly', 'Semi-Annually', 'Annually'],
-                    index=2
-                )
-                
-                if st.button("Optimize My Portfolio"):
-                    if not selected_assets:
-                        st.error("Please select at least one asset to proceed.")
-                    else:
-                        with st.spinner("Calculating..."):
-                            results = perform_optimization(selected_assets, st.session_state.start_date, st.session_state.end_date, rebalance_freq, custom_data)
-                            if results:
-                                st.session_state.results = results
-                                st.success("Optimization complete! Check the Portfolio Results tab.")
 
 with tab2:
     st.title("Portfolio Results")
-    if "results" in st.session_state:
-        results = st.session_state.results
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Allocation Weights (Latest)")
-            st.table(pd.DataFrame({
-                "Asset": results["selected_assets"],
-                "Weight (%)": [w * 100 for w in results["weights"]]
-            }).set_index("Asset").round(2))
-        with col2:
-            st.subheader("Risk Contributions (Latest)")
-            st.table(pd.DataFrame({
-                "Asset": results["selected_assets"],
-                "Contribution (%)": results["risk_contrib_pct"].round(2)
-            }).set_index("Asset"))
-        
-        st.plotly_chart(create_pie_chart(results["selected_assets"], results["weights"] * 100), use_container_width=True)
-        
-        st.plotly_chart(create_bar_chart(results["selected_assets"], results["risk_contrib_pct"]), use_container_width=True)
-        
-        st.subheader("Performance Metrics")
-        col3, col4, col5, col6 = st.columns(4)
-        col3.metric("Expected Annual Return", f"{results['expected_return']:.2f}%")
-        col4.metric("Annual Volatility", f"{results['volatility']:.2f}%")
-        col5.metric("Sharpe Ratio", f"{results['sharpe']:.2f}")
-        col6.metric("Total Transaction Costs", f"{results['total_tc']:.2f}%")
-        
-        st.subheader("Weights Evolution Over Time")
-        st.plotly_chart(results["fig_weights"], use_container_width=True)
-        
-        st.subheader("Cumulative Returns Comparison")
-        st.plotly_chart(create_line_chart(results["cum_port"], results["cum_value_weighted"], results["cum_equally_weighted"]), use_container_width=True)
-        
-        st.subheader("Export Results")
-        export_csv(results["weights_df"], "weights_history.csv")
-        export_pdf(results)
+
+    if "results" not in st.session_state:
+        st.info("Please run an optimization first.")
     else:
-        st.info("Please select assets and optimize in the Asset Selection tab.")
+        results = st.session_state.results
+
+        st.subheader("Final Weights")
+        st.write(
+            pd.DataFrame({
+                "Asset": results["selected_assets"],
+                "Weight": results["weights"]
+            }).set_index("Asset")
+        )
+
+        st.subheader("Risk Contributions (%)")
+        st.write(
+            pd.DataFrame({
+                "Asset": results["selected_assets"],
+                "RC %": results["risk_contrib_pct"]
+            }).set_index("Asset")
+        )
+
+        st.subheader("Performance metrics")
+        st.write(f"Expected annual return: **{results['expected_return']:.2f}%**")
+        st.write(f"Annual volatility: **{results['volatility']:.2f}%**")
+        st.write(f"Sharpe ratio: **{results['sharpe']:.2f}**")
+        st.write(f"Total transaction costs: **{results['total_tc']:.2f}%**")
+
+        st.subheader("Cumulative Performance")
+        st.line_chart(results["cum_port"])
+
+        st.subheader("Correlation Matrix")
+        st.dataframe(results["corr_matrix"])
+
 
 st.markdown("<br>", unsafe_allow_html=True)
 
