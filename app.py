@@ -84,7 +84,7 @@ st.markdown(
         background-position: center;
         z-index: 1002;
         pointer-events: none;
-        border-radius: 60px; /* <--- ADDED THIS LINE TO SMOOTH CORNERS */
+        border-radius: 15px; 
     }}
     
     header .decoration {{ display: none; }}
@@ -135,6 +135,18 @@ st.markdown(
     .stButton>button:hover {{ 
         background-color: #D5D5D5; 
         border-color: #999999;
+    }}
+
+    /* --- ADDED: CUSTOM SLIDER STYLING (GREY) --- */
+    div[data-baseweb="slider"] div {{
+        background-color: #CCCCCC !important; /* Slider Track */
+    }}
+    div[role="slider"] {{
+        background-color: #999999 !important; /* Slider Thumb */
+        box-shadow: none !important;
+    }}
+    .stSlider div[data-testid="stMarkdownContainer"] p {{
+        color: {TEXT_COLOR} !important;
     }}
 
     span[data-baseweb="tag"] {{
@@ -508,10 +520,12 @@ def plot_monte_carlo(dates, median, p95, p05):
         x=dates, y=p95, mode='lines', 
         line=dict(width=0), showlegend=False, hoverinfo='skip'
     ))
+    
+    # CHANGED: fillcolor now matches the light grey theme (rgba version of #E0E0E0)
     fig.add_trace(go.Scatter(
         x=dates, y=p05, mode='lines', 
         line=dict(width=0), fill='tonexty', 
-        fillcolor='rgba(94, 106, 210, 0.2)', 
+        fillcolor='rgba(224, 224, 224, 0.5)', 
         name='95% Confidence Interval'
     ))
     
