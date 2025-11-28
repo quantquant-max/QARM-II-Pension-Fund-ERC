@@ -894,8 +894,28 @@ with tab2:
         c1.plotly_chart(plot_weights_over_time(res), use_container_width=True)
         c2.subheader("Risk Contribution")
         c2.plotly_chart(plot_risk_evolution(res), use_container_width=True)
-        st.subheader("Country Exposure")
+       st.subheader("Country Exposure")
         st.plotly_chart(plot_country_exposure_over_time(res), use_container_width=True)
+
+        # --- INSERTED SNAPSHOT TABLE ---
+        try:
+            last_date = res["weights_df"].index.max()
+            # Extract last row for weights and risk contribution
+            last_w = res["weights_df"].loc[last_date]
+            last_rc = res["rc_df"].loc[last_date]
+            
+            snapshot_df = pd.DataFrame(
+                {
+                    "Weight (%)": last_w * 100,
+                    "Risk Contribution (%)": last_rc,
+                }
+            )
+            
+            st.markdown(f"### Last ERC allocation snapshot on {last_date.date()}")
+            st.dataframe(snapshot_df.style.format("{:.2f}"))
+        except Exception as e:
+            pass
+        # -------------------------------
         
         st.divider()
         
