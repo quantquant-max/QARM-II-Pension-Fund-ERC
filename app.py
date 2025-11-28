@@ -137,14 +137,20 @@ st.markdown(
         border-color: #999999;
     }}
 
-    /* --- ADDED: CUSTOM SLIDER STYLING (GREY) --- */
-    div[data-baseweb="slider"] div {{
-        background-color: #CCCCCC !important; /* Slider Track */
-    }}
-    div[role="slider"] {{
-        background-color: #999999 !important; /* Slider Thumb */
+    /* --- CORRECTED SLIDER STYLING --- */
+    /* 1. Target only the Thumb (the handle) */
+    div[data-baseweb="slider"] div[role="slider"] {{
+        background-color: #999999 !important;
         box-shadow: none !important;
+        border: 1px solid #999999 !important;
     }}
+    
+    /* 2. Target the filled track by overriding the default red background style */
+    /* This looks for the specific RGB red that Streamlit uses and turns it Grey */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {{
+        background-color: #CCCCCC !important;
+    }}
+
     .stSlider div[data-testid="stMarkdownContainer"] p {{
         color: {TEXT_COLOR} !important;
     }}
