@@ -84,7 +84,7 @@ st.markdown(
         background-position: center;
         z-index: 1002;
         pointer-events: none;
-        border-radius: 15px; 
+        border-radius: 60px; 
     }}
     
     header .decoration {{ display: none; }}
