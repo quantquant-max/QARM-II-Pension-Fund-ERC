@@ -894,7 +894,7 @@ with tab2:
         c1.plotly_chart(plot_weights_over_time(res), use_container_width=True)
         c2.subheader("Risk Contribution")
         c2.plotly_chart(plot_risk_evolution(res), use_container_width=True)
-       st.subheader("Country Exposure")
+        st.subheader("Country Exposure")
         st.plotly_chart(plot_country_exposure_over_time(res), use_container_width=True)
 
         # --- INSERTED SNAPSHOT TABLE ---
