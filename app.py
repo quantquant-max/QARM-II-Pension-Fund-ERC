@@ -558,7 +558,7 @@ def plot_monte_carlo(dates, median, p95, p05):
     ))
     
     fig.update_layout(
-        title="10-Year Monte Carlo Projection (Historical Bootstrap)",
+        title="Monte Carlo Projection (Historical Bootstrap)",
         paper_bgcolor="white", plot_bgcolor="white",
         font=dict(color="black", family="Times New Roman"),
         yaxis_title="Portfolio Value ($)",
@@ -778,7 +778,7 @@ with tab2:
 
 with tab3:
     
-    st.write("This simulation projects 10 years into the future using Historical Bootstrap based on your portfolio's assets history.")
+    st.write("This simulation projects into the future using Historical Bootstrap based on your portfolio's assets history.")
     
     if "results" in st.session_state:
         res = st.session_state.results
