@@ -23,6 +23,7 @@ LIGHT_BG = "#FFFFFF"        # Main Background
 SIDEBAR_BG = "#F5F5F5"      # Light Grey Sidebar
 TEXT_COLOR = "#000000"      # Black Text
 TAB_UNDERLINE = "#999999"   # Dark Grey for Tabs
+INFO_BOX_BG = "#F0F0F0"     # Grey for the info box
 
 # --- IMAGE HELPERS ---
 def get_base64_of_bin_file(bin_file):
@@ -137,16 +138,18 @@ st.markdown(
         border-color: #999999;
     }}
 
-    /* --- CORRECTED SLIDER STYLING --- */
-    /* 1. Target only the Thumb (the handle) */
+    /* --- FINAL FIXED SLIDER STYLING --- */
+    /* 1. Target the Thumb (handle) */
     div[data-baseweb="slider"] div[role="slider"] {{
         background-color: #999999 !important;
         box-shadow: none !important;
         border: 1px solid #999999 !important;
     }}
     
-    /* 2. Target the filled track by overriding the default red background style */
-    /* This looks for the specific RGB red that Streamlit uses and turns it Grey */
+    /* 2. Target the filled track (the red part). 
+       We use a very specific attribute selector to catch the inline style Streamlit applies. */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"], 
+    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"],
     div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {{
         background-color: #CCCCCC !important;
     }}
@@ -164,6 +167,17 @@ st.markdown(
     h1, h2, h3, h4, h5, h6, .stHeader, p, label, span, div {{ 
         color: {TEXT_COLOR} !important; 
         font-family: 'Times New Roman', serif; 
+    }}
+    
+    /* Custom Info Box Styling */
+    .custom-info-box {{
+        background-color: {INFO_BOX_BG};
+        border-left: 5px solid #999999;
+        padding: 15px;
+        border-radius: 5px;
+        color: black;
+        font-family: 'Times New Roman', serif;
+        margin-top: 10px;
     }}
     
     @media print {{
@@ -527,7 +541,7 @@ def plot_monte_carlo(dates, median, p95, p05):
         line=dict(width=0), showlegend=False, hoverinfo='skip'
     ))
     
-    # CHANGED: fillcolor now matches the light grey theme (rgba version of #E0E0E0)
+    # Grey Confidence Interval
     fig.add_trace(go.Scatter(
         x=dates, y=p05, mode='lines', 
         line=dict(width=0), fill='tonexty', 
@@ -797,13 +811,18 @@ with tab3:
                 # Chart
                 st.plotly_chart(plot_monte_carlo(dates, median, p95, p05), use_container_width=True)
                 
-                # Interpretation
-                st.info(f"""
-                **Methodology: Historical Bootstrap**
-                Unlike basic simulations that assume markets are 'Normal', this simulation samples from **actual historical events** in your assets' history. This accurately captures:
-                1. **Fat Tails:** Real market crashes and booms.
-                2. **Correlation Spikes:** How your assets move together during crises.
-                """)
+                # Interpretation - CHANGED to Custom Grey Box
+                st.markdown(f"""
+                <div class="custom-info-box">
+                    <strong>Methodology: Historical Bootstrap</strong><br>
+                    Unlike basic simulations that assume markets are 'Normal', this simulation samples from <strong>actual historical events</strong> in your assets' history. This accurately captures:
+                    <ul>
+                        <li><strong>Fat Tails:</strong> Real market crashes and booms.</li>
+                        <li><strong>Correlation Spikes:</strong> How your assets move together during crises.</li>
+                    </ul>
+                </div>
+                """, unsafe_allow_html=True)
+
             else:
                 st.error("Insufficient historical data to run bootstrap simulation.")
             
