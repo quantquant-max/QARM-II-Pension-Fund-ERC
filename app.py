@@ -55,7 +55,6 @@ st.markdown(
         font-family: 'Times New Roman', serif;
     }}
     
-    /* --- HEADER & LOGO --- */
     header {{
         position: absolute !important;
         top: 0 !important;
@@ -91,13 +90,16 @@ st.markdown(
     
     header .decoration {{ display: none; }}
     
-    /* --- CONTAINER SPACING --- */
     .block-container {{
         padding-top: 9rem !important; 
         padding-bottom: 1rem !important;
     }}
     
-    /* --- TABS --- */
+    [data-testid="stAppViewContainer"] {{
+        overflow-x: hidden;
+        overflow-y: auto;
+    }}
+    
     div[data-baseweb="tab-list"] {{
         position: -webkit-sticky !important;
         position: sticky !important;
@@ -107,49 +109,69 @@ st.markdown(
         padding-top: 1rem;
         padding-bottom: 0.5rem;
         border-bottom: 1px solid #E0E0E0;
+        box-shadow: 0 4px 4px -2px rgba(0,0,0,0.05);
     }}
 
     div[data-baseweb="tab-highlight"] {{
         background-color: {TAB_UNDERLINE} !important;
     }}
+    div[data-baseweb="tab-list"] button {{
+        font-family: 'Times New Roman', serif !important;
+        font-weight: bold !important;
+    }}
 
-    /* --- BUTTONS --- */
+    .stSidebar {{ background-color: {SIDEBAR_BG}; }}
+    section[data-testid="stSidebar"] {{ background-color: {SIDEBAR_BG}; color: {TEXT_COLOR}; }}
+
     .stButton>button {{ 
         background-color: {BUTTON_COLOR}; 
         color: {BUTTON_TEXT}; 
         border-radius: 8px; 
+        padding: 10px 24px; 
+        font-family: 'Times New Roman', serif; 
         border: 1px solid #CCCCCC;
         font-weight: bold;
+        transition: all 0.3s ease;
     }}
     .stButton>button:hover {{ 
         background-color: #D5D5D5; 
         border-color: #999999;
     }}
 
-    /* --- FIXED SLIDER STYLING --- */
-    /* 1. The Thumb (Handle) */
+    /* --- FINAL FIXED SLIDER STYLING --- */
+    /* 1. Target the Thumb (handle) */
     div[data-baseweb="slider"] div[role="slider"] {{
         background-color: #999999 !important;
         box-shadow: none !important;
         border: 1px solid #999999 !important;
     }}
     
-    /* 2. The Filled Track (The Bar) 
-       We target all possible formats of the "Red" color Streamlit uses:
-       - Hex: #ff4b4b
-       - RGB with spaces: rgb(255, 75, 75)
-       - RGB without spaces: rgb(255,75,75) 
-    */
-    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"],
-    div[data-baseweb="slider"] div[style*="background-color: rgb(255,75,75)"],
+    /* 2. Target the filled track (the red part). 
+       We use a very specific attribute selector to catch the inline style Streamlit applies. */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"], 
     div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"],
-    div[data-baseweb="slider"] div[style*="background-color: #FF4B4B"] {{
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {{
         background-color: #CCCCCC !important;
     }}
 
-    /* --- CUSTOM INFO BOX (Methodology Section) --- */
+    .stSlider div[data-testid="stMarkdownContainer"] p {{
+        color: {TEXT_COLOR} !important;
+    }}
+
+    span[data-baseweb="tag"] {{
+        background-color: #E8E8E8 !important;
+        color: {TEXT_COLOR} !important;
+        border: 1px solid #d0d0d0;
+    }}
+
+    h1, h2, h3, h4, h5, h6, .stHeader, p, label, span, div {{ 
+        color: {TEXT_COLOR} !important; 
+        font-family: 'Times New Roman', serif; 
+    }}
+    
+    /* Custom Info Box Styling */
     .custom-info-box {{
-        background-color: #E0E0E0; /* Matches your grey theme */
+        background-color: {INFO_BOX_BG};
         border-left: 5px solid #999999;
         padding: 15px;
         border-radius: 5px;
@@ -157,11 +179,26 @@ st.markdown(
         font-family: 'Times New Roman', serif;
         margin-top: 10px;
     }}
-
-    /* --- GENERAL TEXT --- */
-    h1, h2, h3, h4, h5, h6, .stHeader, p, label, span, div {{ 
-        color: {TEXT_COLOR} !important; 
-        font-family: 'Times New Roman', serif; 
+    
+    @media print {{
+        section[data-testid="stSidebar"], 
+        .stButton, 
+        iframe, 
+        .vfrc-widget--chat,
+        header, 
+        div[data-baseweb="tab-list"] {{
+            display: none !important;
+        }}
+        .block-container {{
+            padding-top: 0 !important;
+            margin: 0 !important;
+        }}
+        .stApp {{
+            background-color: white !important;
+        }}
+        .js-plotly-plot {{
+            break-inside: avoid;
+        }}
     }}
     </style>
     """,
