@@ -743,12 +743,12 @@ def create_pdf_report(results):
     
     pdf.set_font("Helvetica", size=11)
     metrics = [
-        ("Expected Return (Ann., ERC)", f"{results['expected_return']:.2f}%"),
+        ("Average Return (Ann., ERC)", f"{results['expected_return']:.2f}%"),
         ("Volatility (Ann., ERC)", f"{results['volatility']:.2f}%"),
         ("Sharpe Ratio (ERC)", f"{results['sharpe']:.2f}"),
         ("Max Drawdown (ERC)", f"{results['max_drawdown']:.2f}%"),
         ("Transaction Costs (ERC)", f"{results['total_tc']:.2f}%"),
-        ("Expected Return (Ann., EW)", f"{results['ew_expected_return']:.2f}%"),
+        ("Average Return (Ann., EW)", f"{results['ew_expected_return']:.2f}%"),
         ("Volatility (Ann., EW)", f"{results['ew_volatility']:.2f}%"),
     ]
     
@@ -1078,7 +1078,17 @@ with tab4:
     cols = st.columns(len(team))
     for i, member in enumerate(team):
         with cols[i]:
-            st.image(member["photo"], width=150)
-            st.markdown(f"### {member['name']}")
-            st.markdown(f"**{member['role']}**")
-            st.write(member["desc"])
+            # Use the same .metric-card-box class for the bubble style
+            st.markdown(
+                f"""
+                <div class="metric-card-box" style="text-align: center; padding: 1.5rem;">
+                    <img src="{member['photo']}" style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 4px solid {BUTTON_COLOR};">
+                    <div class="metric-card-value" style="font-size: 1.3rem; margin-bottom: 0.3rem;">{member['name']}</div>
+                    <div class="metric-card-label" style="font-size: 0.95rem; margin-bottom: 0.8rem; color: #666;">{member['role']}</div>
+                    <div class="metric-card-desc" style="font-size: 0.9rem; line-height: 1.5;">
+                        {member['desc']}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
