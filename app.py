@@ -853,7 +853,7 @@ with tab4:
         {
             "name": "Lucas Jaccard",
             "role": "Frontend Developer",
-            "desc": "Lucas designs the app’s visual experience, combining clarity, interactivity, and elegance to make financial analysis more accessible.",
+            "desc": "Lucas specializes in financial data analytics and portfolio optimization models, contributing quantitative insight to the ERC framework.",
             "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Lucas_JACCARD.JPG"
         },
         {
@@ -871,7 +871,7 @@ with tab4:
         {
             "name": "Rihem Rhaiem",
             "role": "Data Scientist",
-            "desc": "Rihem specializes in financial data analytics and portfolio optimization models, contributing quantitative insight to the ERC framework.",
+            "desc": "Rihem designs the app’s visual experience, combining clarity, interactivity, and elegance to make financial analysis more accessible.",
             "photo": "https://raw.githubusercontent.com/quantquant-max/QARM-II-Pension-Fund-ERC/main/team_photos/Rihem_RHAIEM.JPG"
         },
         {
