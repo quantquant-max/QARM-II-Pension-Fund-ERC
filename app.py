@@ -638,14 +638,19 @@ def plot_monte_carlo(dates, median, p95, p05):
         name='Median Projection'
     ))
     
+    # --- MODIFIED LAYOUT SECTION ---
     fig.update_layout(
-        title="Monte Carlo Projection (Historical Bootstrap using Full Sample)",
+        title="Monte Carlo Projection (Log Scale)",
         paper_bgcolor="white", plot_bgcolor="white",
         font=dict(color="black", family="Times New Roman"),
         yaxis_title="Portfolio Value ($)",
+        # This line enables the Log Scale
+        yaxis=dict(type="log", tickformat=".2s"), 
         height=600,
         template="plotly_white"
     )
+    # -------------------------------
+    
     return fig
 
 # --- CHARTS ---
