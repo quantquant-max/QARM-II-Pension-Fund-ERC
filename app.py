@@ -106,7 +106,7 @@ st.markdown(
         top: 0 !important;
         z-index: 999 !important;
         background-color: {LIGHT_BG} !important;
-        padding-top: 1rem;
+        padding-top: 0.1rem;
         padding-bottom: 0.5rem;
         border-bottom: 1px solid #E0E0E0;
         box-shadow: 0 4px 4px -2px rgba(0,0,0,0.05);
