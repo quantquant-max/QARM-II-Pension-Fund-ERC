@@ -807,7 +807,7 @@ with tab0:
           })(document, 'script');
         </script>
         """,
-        height=850, scrolling=False
+        height=650, scrolling=False
     )
 
 with tab1:
