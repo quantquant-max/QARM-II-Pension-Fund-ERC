@@ -177,14 +177,45 @@ st.markdown(
         margin-top: 10px;
     }}
     
-    /* Three Step Card (For Interpretation) */
-    .three-step-card {{
+    /* UNIFIED CARD STYLING FOR BUBBLES */
+    /* This ensures all cards in a row have equal height */
+    div[data-testid="column"] {{
+        display: flex;
+        flex-direction: column; 
+    }}
+    
+    .metric-card-box {{
         background-color: #FFFFFF;
-        border-radius: 16px;
-        padding: 1.1rem 1.2rem;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.06);
+        border-radius: 12px;
+        padding: 1.2rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         border: 1px solid #E5E7EB;
-        height: 100%;
+        text-align: left;
+        height: 100%; /* Forces equal height */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }}
+    
+    .metric-card-label {{
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #666666;
+        margin-bottom: 0.3rem;
+    }}
+    
+    .metric-card-value {{
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #000000;
+        margin-bottom: 0.2rem;
+    }}
+    
+    .metric-card-desc {{
+        font-size: 0.9rem;
+        color: #333333;
+        line-height: 1.4;
     }}
 
     @media print {{
@@ -340,7 +371,7 @@ def compute_max_drawdown(cumulative_returns):
     return drawdowns.min() * 100
 
 @st.cache_data(show_spinner=True)
-def perform_optimization(selected_assets, start_date_user, end_date_user, rebalance_freq, _custom_data, _rf_data, _tx_cost_data, lookback_months=36, ann_factor=12, _version=10):
+def perform_optimization(selected_assets, start_date_user, end_date_user, rebalance_freq, _custom_data, _rf_data, _tx_cost_data, lookback_months=36, ann_factor=12, _version=11):
     custom_data = _custom_data 
     rf_data = _rf_data
     tx_cost_data = _tx_cost_data
@@ -376,7 +407,7 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
         total_tc_erc = 0.0
         rc_pct = np.zeros(n) 
 
-        # EW Vars (RESTORED)
+        # EW Vars
         ew_weights_const = np.ones(n) / n
         previous_weights_ew = np.zeros(n)
         port_returns_ew = pd.Series(index=period_dates, dtype=float).fillna(0.0)
@@ -433,7 +464,7 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
             rc_over_time[rebal_date] = current_rc
             rc_pct = current_rc
 
-            # Transaction Costs (Shared rate)
+            # Transaction Costs
             if not tx_cost_data.empty:
                 try:
                     if not tx_cost_data.index.is_monotonic_increasing: tx_cost_data = tx_cost_data.sort_index()
@@ -450,7 +481,7 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
             previous_weights_erc = current_weights_erc.copy()
             weights_over_time_erc[rebal_date] = current_weights_erc
             
-            # --- EW CALCULATION (RESTORED) ---
+            # --- EW CALCULATION ---
             current_weights_ew = ew_weights_const.copy()
             traded_volume_ew = np.sum(np.abs(current_weights_ew - previous_weights_ew))
             cost_ew = traded_volume_ew * current_tx_rate
@@ -489,8 +520,11 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
             port_excess_returns_erc = port_returns_erc
             port_excess_returns_ew = port_returns_ew
             
+        # BENCHMARK Calculation
         benchmark_asset = "SPDR S&P 500 ETF"
         cum_benchmark = pd.Series(dtype=float) 
+        bench_excess = pd.Series(dtype=float)
+
         if benchmark_asset in custom_data.columns:
              bench_ret = custom_data[benchmark_asset].reindex(port_returns_erc.index).fillna(0.0)
              if not rf_data.empty:
@@ -513,6 +547,15 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
         cum_port_excess_ew = (1 + port_excess_returns_ew).cumprod()
         max_drawdown_ew = compute_max_drawdown(cum_port_excess_ew)
 
+        # Metrics Benchmark (S&P 500)
+        ann_vol_bench = 0.0
+        ann_excess_ret_bench = 0.0
+        sharpe_bench = 0.0
+        if not bench_excess.empty:
+            ann_vol_bench = bench_excess.std() * np.sqrt(ann_factor)
+            ann_excess_ret_bench = bench_excess.mean() * ann_factor
+            sharpe_bench = ann_excess_ret_bench / ann_vol_bench if ann_vol_bench > 0 else 0.0
+
         return {
             "selected_assets": selected_assets,
             "weights": current_weights_erc,
@@ -532,13 +575,16 @@ def perform_optimization(selected_assets, start_date_user, end_date_user, rebala
             "ew_max_drawdown": max_drawdown_ew,
             "ew_total_tc": total_tc_ew * 100,
             "ew_cum_port": cum_port_excess_ew,
-            # Common
+            # Benchmark Results
             "cum_benchmark": cum_benchmark,
+            "bench_expected_return": ann_excess_ret_bench * 100,
+            "bench_volatility": ann_vol_bench * 100,
+            "bench_sharpe": sharpe_bench,
+            # Common
             "weights_df": pd.DataFrame(weights_over_time_erc, index=selected_assets).T.sort_index(),
             "rc_df": pd.DataFrame(rc_over_time, index=selected_assets).T.sort_index(),
             "corr_matrix": est_window_clean.corr() if 'est_window_clean' in locals() else pd.DataFrame(),
             "country_exposure_over_time": country_exposure_over_time,
-            # MODIFIED: Return FULL history for Monte Carlo, not just the window
             "hist_data": full_returns.dropna(how='any') 
         }
     except Exception as e:
@@ -555,45 +601,29 @@ def run_monte_carlo(hist_returns_df, weights, years=10, simulations=1000, initia
     if hist_returns_df.empty:
         return [], [], [], [], []
         
-    # 1. Calculate Portfolio Historical Returns using the provided weights
-    # Note: We use the final weights to project forward based on full history behavior
     port_hist_returns = hist_returns_df.values @ weights
-    
-    n_steps = int(years * 12) # Monthly steps
-    
-    # 2. Bootstrap Engine (Sample from history with replacement)
+    n_steps = int(years * 12) 
     random_indices = np.random.choice(len(port_hist_returns), size=(simulations, n_steps))
-    
-    # 3. Construct Paths
     simulated_returns = port_hist_returns[random_indices]
-    
-    # Growth factors: (1 + r)
     growth_factors = 1 + simulated_returns
-    
-    # Accumulate
     cumulative_growth = np.cumprod(growth_factors, axis=1)
-    
-    # Scale by capital
     price_paths = initial_capital * np.hstack([np.ones((simulations, 1)), cumulative_growth])
     
-    # 4. Statistics
     dates = [datetime.now() + timedelta(days=30*i) for i in range(n_steps + 1)]
     median_path = np.median(price_paths, axis=0)
-    p95 = np.percentile(price_paths, 95, axis=0) # Bull case
-    p05 = np.percentile(price_paths, 5, axis=0)  # Bear case (Tail Risk)
+    p95 = np.percentile(price_paths, 95, axis=0) 
+    p05 = np.percentile(price_paths, 5, axis=0)  
     
     return dates, median_path, p95, p05, price_paths
 
 def plot_monte_carlo(dates, median, p95, p05):
     fig = go.Figure()
     
-    # Fan Chart "Cone of Uncertainty"
     fig.add_trace(go.Scatter(
         x=dates, y=p95, mode='lines', 
         line=dict(width=0), showlegend=False, hoverinfo='skip'
     ))
     
-    # Grey Confidence Interval
     fig.add_trace(go.Scatter(
         x=dates, y=p05, mode='lines', 
         line=dict(width=0), fill='tonexty', 
@@ -601,7 +631,6 @@ def plot_monte_carlo(dates, median, p95, p05):
         name='95% Confidence Interval'
     ))
     
-    # Median Path
     fig.add_trace(go.Scatter(
         x=dates, y=median, 
         mode='lines', 
@@ -627,14 +656,12 @@ def plot_cumulative_performance(results):
     
     fig = go.Figure()
     
-    # ERC Line
     fig.add_trace(go.Scatter(
         x=cum_erc.index, y=cum_erc.values, 
         mode="lines", name="ERC Portfolio", 
         line=dict(color="#5e6ad2", width=3)
     ))
 
-    # EW Line (Added)
     if not cum_ew.empty:
         fig.add_trace(go.Scatter(
             x=cum_ew.index, y=cum_ew.values, 
@@ -642,7 +669,6 @@ def plot_cumulative_performance(results):
             line=dict(color="#888888", width=2, dash="dot")
         ))
         
-    # Benchmark Line
     if not cum_bench.empty:
         fig.add_trace(go.Scatter(
             x=cum_bench.index, y=cum_bench.values, 
@@ -650,8 +676,7 @@ def plot_cumulative_performance(results):
             line=dict(color="#333333", width=2, dash="dash")
         ))
     
-    # Log Scale
-    cum_series = cum_erc # use ERC for scaling ref
+    cum_series = cum_erc 
     min_val, max_val = cum_series.min(), cum_series.max()
     if min_val > 0 and max_val > 0:
         log_min, log_max = np.log10(min_val), np.log10(max_val)
@@ -746,7 +771,7 @@ def create_pdf_report(results):
             pdf.image(img_stream, x=10, w=190) 
 
     fig_cum = plot_cumulative_performance(results)
-    add_plot_to_pdf(fig_cum, "2. Cumulative Performance (ERC vs EW)")
+    add_plot_to_pdf(fig_cum, "2. Cumulative Performance")
 
     fig_weights = plot_weights_over_time(results)
     add_plot_to_pdf(fig_weights, "3. Asset Allocation Evolution")
@@ -819,21 +844,49 @@ with tab2:
     if "results" in st.session_state:
         res = st.session_state.results
         
-        # --- BUBBLES / METRICS (As Requested) ---
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("Excess Return (ERC)", f"{res['expected_return']:.2f}%")
-        col2.metric("Volatility (ERC)", f"{res['volatility']:.2f}%")
-        col3.metric("Sharpe Ratio (ERC)", f"{res['sharpe']:.2f}")
-        col4.metric("Max Drawdown (ERC)", f"{res['max_drawdown']:.2f}%")
-        col5.metric("Trans. Costs (ERC)", f"{res['total_tc']:.2f}%")
+        # --- BUBBLES / METRICS (STYLED AS CARDS) ---
+        # Data for the 5 top cards
+        top_metrics = [
+            {"label": "Excess Return", "value": f"{res['expected_return']:.2f}%", "desc": "Annualized"},
+            {"label": "Volatility", "value": f"{res['volatility']:.2f}%", "desc": "Annualized"},
+            {"label": "Sharpe Ratio", "value": f"{res['sharpe']:.2f}", "desc": "Risk-Adjusted"},
+            {"label": "Max Drawdown", "value": f"{res['max_drawdown']:.2f}%", "desc": "Peak-to-Trough"},
+            {"label": "Trans. Costs", "value": f"{res['total_tc']:.2f}%", "desc": "Total Impact"},
+        ]
         
-        # Display comparison to EW if interesting
-        with st.expander("Compare with Equal Weight Strategy"):
-             c_ew1, c_ew2, c_ew3 = st.columns(3)
-             c_ew1.metric("Excess Return (EW)", f"{res['ew_expected_return']:.2f}%", delta=f"{res['ew_expected_return'] - res['expected_return']:.2f}% vs ERC")
-             c_ew2.metric("Volatility (EW)", f"{res['ew_volatility']:.2f}%", delta=f"{res['ew_volatility'] - res['volatility']:.2f}% vs ERC", delta_color="inverse")
-             c_ew3.metric("Sharpe (EW)", f"{res['ew_sharpe']:.2f}")
+        cols = st.columns(5)
+        for col, metric in zip(cols, top_metrics):
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="metric-card-box">
+                        <div class="metric-card-label">{metric['label']}</div>
+                        <div class="metric-card-value">{metric['value']}</div>
+                        <div class="metric-card-desc">{metric['desc']}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- COMPARISONS (EW & BENCHMARK) ---
+        # 1. Equal Weight
+        if "ew_expected_return" in res:
+            with st.expander("Compare with Equal Weight Strategy", expanded=False):
+                 c_ew1, c_ew2, c_ew3 = st.columns(3)
+                 c_ew1.metric("Excess Return (EW)", f"{res['ew_expected_return']:.2f}%", delta=f"{res['ew_expected_return'] - res['expected_return']:.2f}% vs ERC")
+                 c_ew2.metric("Volatility (EW)", f"{res['ew_volatility']:.2f}%", delta=f"{res['ew_volatility'] - res['volatility']:.2f}% vs ERC", delta_color="inverse")
+                 c_ew3.metric("Sharpe (EW)", f"{res['ew_sharpe']:.2f}")
 
+        # 2. Benchmark (S&P 500)
+        if "bench_expected_return" in res and res['bench_volatility'] > 0:
+            with st.expander("Compare with S&P 500 (Benchmark)", expanded=False):
+                 c_b1, c_b2, c_b3 = st.columns(3)
+                 c_b1.metric("Excess Return (SP500)", f"{res['bench_expected_return']:.2f}%", delta=f"{res['bench_expected_return'] - res['expected_return']:.2f}% vs ERC")
+                 c_b2.metric("Volatility (SP500)", f"{res['bench_volatility']:.2f}%", delta=f"{res['bench_volatility'] - res['volatility']:.2f}% vs ERC", delta_color="inverse")
+                 c_b3.metric("Sharpe (SP500)", f"{res['bench_sharpe']:.2f}")
+        
         # Charts
         st.plotly_chart(plot_cumulative_performance(res), use_container_width=True)
         c1, c2 = st.columns(2)
@@ -846,20 +899,21 @@ with tab2:
         
         st.divider()
         
-        # --- INTERPRETATION (Added as Requested) ---
+        # --- INTERPRETATION (STYLED IDENTICALLY TO TOP BUBBLES) ---
         st.markdown("### Short interpretation for a client")
         col_i1, col_i2, col_i3 = st.columns(3)
+        
+        # Using the SAME class 'metric-card-box' so they look identical and handle height the same way
         with col_i1:
             st.markdown(
                 f"""
-                <div class="three-step-card">
-                    <h4>ERC portfolio</h4>
-                    <p>
-                        Delivers an annualized excess return of
-                        <strong>{res['expected_return']:.2f}%</strong> for a volatility of
-                        <strong>{res['volatility']:.2f}%</strong>, resulting in a Sharpe ratio of
-                        <strong>{res['sharpe']:.2f}</strong>.
-                    </p>
+                <div class="metric-card-box">
+                    <div class="metric-card-label">ERC Portfolio</div>
+                    <div class="metric-card-desc">
+                        Delivers an annualized excess return of <strong>{res['expected_return']:.2f}%</strong> 
+                        for a volatility of <strong>{res['volatility']:.2f}%</strong> 
+                        (Sharpe: {res['sharpe']:.2f}).
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -867,13 +921,13 @@ with tab2:
         with col_i2:
             st.markdown(
                 f"""
-                <div class="three-step-card">
-                    <h4>Equal-Weight benchmark</h4>
-                    <p>
-                        On the same asset universe, the Equal-Weight portfolio achieves
+                <div class="metric-card-box">
+                    <div class="metric-card-label">Equal-Weight Benchmark</div>
+                    <div class="metric-card-desc">
+                        On the same asset universe, the Equal-Weight portfolio achieves 
                         <strong>{res['ew_expected_return']:.2f}%</strong> annualized excess return,
                         with volatility of <strong>{res['ew_volatility']:.2f}%</strong>.
-                    </p>
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -881,13 +935,13 @@ with tab2:
         with col_i3:
             st.markdown(
                 """
-                <div class="three-step-card">
-                    <h4>Key takeaway</h4>
-                    <p>
-                        The ERC approach aims to <strong>equalize risk contributions</strong> across assets.
-                        For a client, this means a more <strong>balanced risk allocation</strong> than a naive
-                        Equal-Weight rule, potentially reducing concentration in a single risk bucket.
-                    </p>
+                <div class="metric-card-box">
+                    <div class="metric-card-label">Key Takeaway</div>
+                    <div class="metric-card-desc">
+                        The ERC approach aims to <strong>equalize risk contributions</strong>.
+                        This provides a more <strong>balanced risk allocation</strong> than naive rules, 
+                        reducing concentration in single risk buckets.
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -924,7 +978,6 @@ with tab3:
         initial_inv = c1.number_input("Initial Investment ($)", value=100000, step=10000)
         sim_years = c2.slider("Projection Years", 5, 20, 10)
         
-        # Use FULL SAMPLE history (passed via res['hist_data'])
         if res["hist_data"].shape[0] < 60:
              st.warning("Warning: Less than 60 months of data available. Simulation may be less robust.")
 
