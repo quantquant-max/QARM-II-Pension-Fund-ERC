@@ -91,7 +91,7 @@ st.markdown(
     header .decoration {{ display: none; }}
     
     .block-container {{
-        padding-top: 9rem !important; 
+        padding-top: 8rem !important; 
         padding-bottom: 1rem !important;
     }}
     
