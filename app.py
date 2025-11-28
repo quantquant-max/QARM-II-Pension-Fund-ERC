@@ -991,15 +991,56 @@ with tab3:
             )
             
             if len(dates) > 0:
-                # Metrics
+                # Metrics Calculation
                 final_median = median[-1]
                 final_95 = p95[-1]
                 final_05 = p05[-1]
                 
+                # Calculate percentages for the description
+                ret_med = ((final_median / initial_inv) - 1) * 100
+                ret_95 = ((final_95 / initial_inv) - 1) * 100
+                ret_05 = ((final_05 / initial_inv) - 1) * 100
+                
+                # --- BUBBLES (STYLED AS CARDS) ---
                 m1, m2, m3 = st.columns(3)
-                m1.metric("Median Ending Value", f"${final_median:,.0f}")
-                m2.metric("Bull Case (95th)", f"${final_95:,.0f}", delta=f"{((final_95/initial_inv)-1)*100:.0f}%")
-                m3.metric("Bear Case (5th)", f"${final_05:,.0f}", delta=f"{((final_05/initial_inv)-1)*100:.0f}%")
+                
+                with m1:
+                    st.markdown(
+                        f"""
+                        <div class="metric-card-box">
+                            <div class="metric-card-label">Median Ending Value</div>
+                            <div class="metric-card-value">${final_median:,.0f}</div>
+                            <div class="metric-card-desc">Total Return: {ret_med:,.0f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                with m2:
+                    st.markdown(
+                        f"""
+                        <div class="metric-card-box">
+                            <div class="metric-card-label">Bull Case (95th)</div>
+                            <div class="metric-card-value">${final_95:,.0f}</div>
+                            <div class="metric-card-desc">Total Return: {ret_95:,.0f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                with m3:
+                    st.markdown(
+                        f"""
+                        <div class="metric-card-box">
+                            <div class="metric-card-label">Bear Case (5th)</div>
+                            <div class="metric-card-value">${final_05:,.0f}</div>
+                            <div class="metric-card-desc">Total Return: {ret_05:,.0f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                
+                st.markdown("<br>", unsafe_allow_html=True)
                 
                 # Chart
                 st.plotly_chart(plot_monte_carlo(dates, median, p95, p05), use_container_width=True)
