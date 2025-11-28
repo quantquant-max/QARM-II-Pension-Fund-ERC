@@ -84,6 +84,7 @@ st.markdown(
         background-position: center;
         z-index: 1002;
         pointer-events: none;
+        border-radius: 15px; /* <--- ADDED THIS LINE TO SMOOTH CORNERS */
     }}
     
     header .decoration {{ display: none; }}
