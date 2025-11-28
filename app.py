@@ -1148,7 +1148,7 @@ with tab4:
             st.markdown(
                 f"""
                 <div class="metric-card-box" style="text-align: center; padding: 1.5rem;">
-                    <img src="{member['photo']}" style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 4px solid {BUTTON_COLOR};">
+                    <img src="{member['photo']}" style="display: block; margin: 0 auto 1rem auto; width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 4px solid {BUTTON_COLOR};">
                     <div class="metric-card-value" style="font-size: 1.3rem; margin-bottom: 0.3rem;">{member['name']}</div>
                     <div class="metric-card-label" style="font-size: 0.95rem; margin-bottom: 0.8rem; color: #666;">{member['role']}</div>
                     <div class="metric-card-desc" style="font-size: 0.9rem; line-height: 1.5;">
