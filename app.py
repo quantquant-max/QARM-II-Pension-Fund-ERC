@@ -138,23 +138,21 @@ st.markdown(
         border-color: #999999;
     }}
 
-    /* --- FIXED SLIDER STYLING --- */
-    
-    /* 1. The Thumb (Handle) */
-    div[data-baseweb="slider"] div[role="slider"] {
+    /* --- FINAL FIXED SLIDER STYLING --- */
+    /* 1. Target the Thumb (handle) */
+    div[data-baseweb="slider"] div[role="slider"] {{
         background-color: #999999 !important;
         box-shadow: none !important;
         border: 1px solid #999999 !important;
-    }
+    }}
     
-    /* 2. The Filled Track (The Bar) 
-       Logic: Target any div inside the slider that has a background color set inline,
-       but exclude the thumb itself. This forces the "Red" bar to be Grey regardless 
-       of how the browser formats the color string. 
-    */
-    div[data-baseweb="slider"] div[style*="background-color"]:not([role="slider"]) {
+    /* 2. Target the filled track (the red part). 
+       We use a very specific attribute selector to catch the inline style Streamlit applies. */
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"], 
+    div[data-baseweb="slider"] div[style*="background-color: #ff4b4b"],
+    div[data-baseweb="slider"] div[style*="background-color: rgb(255, 75, 75)"] {{
         background-color: #CCCCCC !important;
-    }
+    }}
 
     .stSlider div[data-testid="stMarkdownContainer"] p {{
         color: {TEXT_COLOR} !important;
